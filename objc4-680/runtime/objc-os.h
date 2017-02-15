@@ -137,6 +137,7 @@ subc(uintptr_t lhs, uintptr_t rhs, uintptr_t carryin, uintptr_t *carryout)
 
 
 #if __arm64__
+//ARM CPU的指令集，原则上是向下兼容
 
 static ALWAYS_INLINE
 uintptr_t 
