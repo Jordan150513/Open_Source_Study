@@ -67,7 +67,7 @@ class nocopy_t {
     ~nocopy_t() { }
 };
 
-//如果是OS_MAC系统 --227L
+//如果是OS_MAC系统
 #if TARGET_OS_MAC
 
 #   ifndef __STDC_LIMIT_MACROS
@@ -223,7 +223,7 @@ StoreReleaseExclusive(uintptr_t *dst, uintptr_t oldvalue, uintptr_t value)
 {
     return StoreExclusive(dst, oldvalue, value);
 }
-//如果不是OS_MAC系统，鬼知道能干啥 unknown体系结构 from 70L to 227L
+//如果不是x86_64||i386||arm||arm64   unknown(指令)体系结构 from 139L to 227L
 #else 
 #   error unknown architecture
 #endif
@@ -289,6 +289,7 @@ class spinlock_t {
     OBJC_EXTERN __attribute__((noinline, used, visibility("hidden"))) \
     prototype { asm(""); }
 
+//os系统结束 如果是windows32系统
 #elif TARGET_OS_WIN32
 
 #   define WINVER 0x0501		// target Windows XP and later
@@ -334,6 +335,7 @@ class spinlock_t {
 #   define OBJC_RUNTIME_OBJC_EXCEPTION_RETHROW() do {} while(0)  
 #   define OBJC_RUNTIME_OBJC_EXCEPTION_THROW(arg0) do {} while(0)
 
+//除了os 和 windows 之外的操作系统 识别为unknown OS
 #else
 #   error unknown OS
 #endif

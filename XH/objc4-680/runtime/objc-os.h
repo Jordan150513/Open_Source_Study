@@ -231,7 +231,7 @@ static ALWAYS_INLINE
 bool 
 StoreExclusive(uintptr_t *dst, uintptr_t oldvalue, uintptr_t value)
 {
-    // __sync_bool_compare_and_swap  是 GCC 内建的原子操作函数， 执行CAS操作，也就是 比较 dst 和 oldValue 如果相等就将 value 放到 dst 中，并且返回true，否则返回false。
+    // __sync_bool_compare_and_swap  是 GCC编译器 内建的原子操作函数， 执行CAS操作，也就是 比较 dst 和 oldValue 如果相等就将 value 放到 dst 中，并且返回true，否则返回false。
     // 所以失败的线程都会进入while循环里去，忙等，直到成功为止，例如：setHasAssociatedObjects()
     return __sync_bool_compare_and_swap((void **)dst, (void *)oldvalue, (void *)value);
 }
@@ -480,7 +480,7 @@ static __inline int32_t OSAtomicIncrement32Barrier(volatile int32_t *dst)
 }
 
 
-// Internal data types
+// Internal data types 内部数据类型
 
 typedef DWORD objc_thread_t;  // thread ID
 static __inline int thread_equal(objc_thread_t t1, objc_thread_t t2) { 
@@ -573,12 +573,13 @@ static inline void _mutex_unlock(mutex_t *m) { ReleaseMutex(*m); }
 // Vista-only CONDITION_VARIABLE would be better
 typedef struct {
     HANDLE mutex;
-    HANDLE waiters;      // semaphore for those in cond_wait()
+    HANDLE waiters;      // semaphore for those in cond_wait() cond_wait()方法中所用的信号量
     HANDLE waitersDone;  // auto-reset event after everyone gets a broadcast
     CRITICAL_SECTION waitCountLock;  // guards waitCount and didBroadcast
     unsigned int waitCount;
     int didBroadcast; 
 } monitor_t;
+//monitor 监视 观察
 #define MONITOR_INITIALIZER { 0 }
 #define MONITOR_NOT_ENTERED 1
 extern int monitor_init(monitor_t *c);
@@ -660,7 +661,7 @@ typedef IMAGE_DOS_HEADER headerType;
 OBJC_EXTERN IMAGE_DOS_HEADER __ImageBase;
 #define libobjc_header ((headerType *)&__ImageBase)
 
-// Prototypes
+// Prototypes 原型
 
 
 #elif TARGET_OS_MAC
@@ -679,15 +680,15 @@ OBJC_EXTERN IMAGE_DOS_HEADER __ImageBase;
 #endif
 
 
-// Compiler compatibility
+// Compiler compatibility 编译器兼容
 
-// OS compatibility
+// OS compatibility OS兼容
 
 static inline uint64_t nanoseconds() {
     return mach_absolute_time();
 }
 
-// Internal data types
+// Internal data types 内部数据类型
 
 typedef pthread_t objc_thread_t;
 
@@ -1025,8 +1026,8 @@ using recursive_mutex_t = recursive_mutex_tt<DEBUG>;
  设有两个共享的变量 x 和 y，通过互斥量 mut 保护，当 x > y 时，条件变量 cond 被触发。
  int x,y;
  int x,y;
- pthread_mutex_t mut = PTHREAD_MUTEX_INITIALIZER;
- pthread_cond_t cond = PTHREAD_COND_INITIALIZER;
+ pthread_mutex_t mut = PTHREAD_MUTEX_INITIALIZER; 互斥量
+ pthread_cond_t cond = PTHREAD_COND_INITIALIZER; 条件信号量
  
  
  I 等待直到 x > y 的执行流程：
@@ -1074,7 +1075,7 @@ using recursive_mutex_t = recursive_mutex_tt<DEBUG>;
 
 // 模板中 bool Debug 表示是否是在 DEBUG 模式
 template <bool Debug>
-class monitor_tt {
+class monitor_tt {   //观察者 监视者
     pthread_mutex_t mutex;  // 互斥量，玩法就是 加锁、解锁
     pthread_cond_t cond;    // 条件变量
     
@@ -1146,7 +1147,7 @@ class monitor_tt {
 using monitor_t = monitor_tt<DEBUG>;
 
 
-// semaphore_create formatted for INIT_ONCE use
+// semaphore_create formatted for INIT_ONCE use //创建一次以后即可使用的 信号量创建 模板
 static inline semaphore_t create_semaphore(void)
 {
     semaphore_t sem;

@@ -30,11 +30,12 @@
 #ifndef _OBJC_OBJCOBJECT_H_
 #define _OBJC_OBJCOBJECT_H_
 
+//主要由调用方法 返回值的问题 autorelease retain release ISA IMP：Implementation的缩写，顾名思义，它是指向一个方法实现的指针，每一个方法都有一个对应的IMP
 
 // 只引用了这一个头文件，所以只和 objc-private 有关系
 #include "objc-private.h"
 
-
+//定义枚举类型 ReturnDisposition ---dd----
 enum ReturnDisposition : bool {
     ReturnAtPlus0 = false,
     ReturnAtPlus1 = true
@@ -79,7 +80,7 @@ objc_object::isClass()
     return ISA()->isMetaClass();
 }
 
-#if SUPPORT_NONPOINTER_ISA  // iphone 真机支持
+#if SUPPORT_NONPOINTER_ISA  // iphone 真机支持 ---82---826----支持--SUPPORT_NONPOINTER_ISA-----
 
 #   if !SUPPORT_TAGGED_POINTERS
 #       error sorry
@@ -558,13 +559,13 @@ objc_object::release()
     assert(!UseGC  ||  ISA()->hasCustomRR());
     assert(!isTaggedPointer());
 
-    // 没有自定义 retain/release
+    // 没有自定义 retain/release //hasCustomRR() ：判断是否有自定义的 retain release
     if (! ISA()->hasCustomRR()) {
         rootRelease();
         return;
     }
 
-    // 有自定义 RR
+    // 有自定义 RR retain release
     ((void(*)(objc_object *, SEL))objc_msgSend)(this, SEL_release);
 }
 
@@ -634,7 +635,7 @@ objc_object::rootRelease(bool performDealloc, bool handleUnderflow)
     // 让 newisa 重新等于 oldisa，回到减一前的状态
     newisa = oldisa;
 
-    // 如果有部分引用计数存在了 side table 中
+    // 如果有部分引用计数存在了 side table 中 side table是什么？具体在哪里定义的side table
     if (newisa.has_sidetable_rc) {
         
         // 不处理溢出
@@ -769,13 +770,13 @@ objc_object::autorelease()
         return rootAutorelease();
     }
 
-    // 有自定义 RR 的话，就需要发消息，objc_msgSend 会查找合适的 IMP 来处理
+    // 有自定义 RR 的话，就需要发消息，objc_msgSend 会查找合适的 IMP 来处理 ----IMP具体的定义在哪里？？----dd--
     return ((id(*)(objc_object *, SEL))objc_msgSend)(this, SEL_autorelease);
 }
 
 
 // Base autorelease implementation, ignoring overrides.
-// 基础的 autorelease 的实现，如果没有自定义的 RR 的话，就可以直接调用这个函数，将对象放入自动释放池
+// 基础的 autorelease 的实现，如果没有自定义的 RR(retain release) 的话，就可以直接调用这个函数，将对象放入自动释放池
 // 这样，就绕过了 objc_msgSend，少了很多步骤，效率会高不少，见 objc_object::autorelease()
 // 调用者：autorelease() / _objc_rootAutorelease() / objc_object::autorelease()
 inline id 
@@ -784,7 +785,7 @@ objc_object::rootAutorelease()
     assert(!UseGC);
 
     if (isTaggedPointer()) return (id)this;
-    // 检测是否支持 Optimized Return（不知道干嘛用的）
+    // 检测是否支持 Optimized Return（不知道干嘛用的） --如果优化成功 就----dd---
     if (prepareOptimizedReturn(ReturnAtPlus1)) return (id)this;
 
     // rootAutorelease2 里的操作是，将当前对象添加进了当前的 autoreleasepage 中
@@ -822,9 +823,9 @@ objc_object::rootRetainCount()
 }
 
 
-// SUPPORT_NONPOINTER_ISA
+// SUPPORT_NONPOINTER_ISA --- ---82---826----支持--SUPPORT_NONPOINTER_ISA-----
 #else
-// not SUPPORT_NONPOINTER_ISA
+// not SUPPORT_NONPOINTER_ISA ----827----1132----不支持--not SUPPORT_NONPOINTER_ISA----
 
 // 不支持 non-pointer isa 的时候，引用计数都保存在 side table 中
 // 所以少了很多判断逻辑，代码都很简单
@@ -1127,7 +1128,7 @@ objc_object::rootRetainCount()
 }
 
 
-// not SUPPORT_NONPOINTER_ISA
+// not SUPPORT_NONPOINTER_ISA  ----827----1132----不支持--not SUPPORT_NONPOINTER_ISA----
 
 #endif
 
@@ -1217,7 +1218,7 @@ objc_object::rootRetainCount()
 # if __x86_64__
 
 static ALWAYS_INLINE bool 
-callerAcceptsOptimizedReturn(const void * const ra0)
+callerAcceptsOptimizedReturn(const void * const ra0)// x86_64 指令集中 调用者接收优化过的返回值
 {
     const uint8_t *ra1 = (const uint8_t *)ra0;
     const uint16_t *ra2;
@@ -1263,7 +1264,7 @@ callerAcceptsOptimizedReturn(const void * const ra0)
 # elif __arm__
 
 static ALWAYS_INLINE bool 
-callerAcceptsOptimizedReturn(const void *ra)
+callerAcceptsOptimizedReturn(const void *ra)// arm 指令集中 调用者接收优化过的返回值
 {
     // if the low bit is set, we're returning to thumb mode
     if ((uintptr_t)ra & 1) {
@@ -1286,7 +1287,7 @@ callerAcceptsOptimizedReturn(const void *ra)
 
 // 判断调用者是否能接受优化的返回值（避开 autorelease）
 static ALWAYS_INLINE bool 
-callerAcceptsOptimizedReturn(const void *ra)
+callerAcceptsOptimizedReturn(const void *ra)  // arm64 指令集中 调用者接收优化过的返回值
 {
     // fd 03 1d aa    mov fp, fp
     if (*(uint32_t *)ra == 0xaa1d03fd) {
@@ -1299,7 +1300,7 @@ callerAcceptsOptimizedReturn(const void *ra)
 # elif __i386__  &&  TARGET_IPHONE_SIMULATOR
 
 static inline bool 
-callerAcceptsOptimizedReturn(const void *ra)
+callerAcceptsOptimizedReturn(const void *ra) // i386 指令集中 调用者接收优化过的返回值
 {
     return false;
 }
@@ -1310,7 +1311,7 @@ callerAcceptsOptimizedReturn(const void *ra)
 #warning unknown architecture
 
 static ALWAYS_INLINE bool 
-callerAcceptsOptimizedReturn(const void *ra)
+callerAcceptsOptimizedReturn(const void *ra) // 未知的 指令集中
 {
     return false;
 }
