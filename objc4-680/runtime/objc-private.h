@@ -30,11 +30,11 @@
 
 #include "objc-config.h"
 
-/* Isolate ourselves from the definitions of id and Class in the compiler 
+/* Isolate（使脱离 隔离） ourselves from the definitions of id and Class in the compiler
  * and public headers.
  */
 
-#ifdef _OBJC_OBJC_H_
+#ifdef _OBJC_OBJC_H_ //objc.h中定义了这个_OBJC_OBJC_H_
 #error include objc-private.h before other headers
 #endif
 
@@ -45,41 +45,62 @@
 #include <stdint.h>
 #include <assert.h>
 
-struct objc_class;
-struct objc_object;
+//向前声明 objc_class 的实现在 objc-runtime-new 里，它继承自 objc_object ------下一步需要去objc-runtime-new确认
+struct objc_class;//类
+struct objc_object;//实例对象
 
-typedef struct objc_class *Class;
-typedef struct objc_object *id;
+typedef struct objc_class *Class; // Class 是指向一个objc_class(结构体)的指针
+typedef struct objc_object *id;   // id是一个指向一个objc_object(结构体)的指针
 
+//这里是匿名的 namespace
 namespace {
     struct SideTable;
 };
+/*
+ struct objc_object {
+ // 实际在objc_private.h中objc_object是没有Class isa这个字段的
+ // 有的只是isa_t isa这个私有的字段，代表对象类型的Class cls字段存储在 isa_t 结构体中
+ // Apple玩这么一手，轻易的就把底层实现给隐藏了
+ Class isa  OBJC_ISA_AVAILABILITY;
+ };
+ */
 
+#pragma mark - isa_t 联合体的定义
 
-union isa_t 
+union isa_t //isa的真实替代 isa只是暴露出来的供参观的，其实是isa_t
 {
-    isa_t() { }
-    isa_t(uintptr_t value) : bits(value) { }
+    isa_t() { }  //析构函数？？？ 是构造函数 构造函数和析构函数的区别 (*^__^*) 嘻嘻……
+    isa_t(uintptr_t value) : bits(value) { }   //???
 
-    Class cls;
+    Class cls; //类
     uintptr_t bits;
 
-#if SUPPORT_NONPOINTER_ISA
+    
+    // 用 64 bit 存储一个内存地址显然是种浪费，毕竟很少有那么大内存的设备。于是可以优化存储方案，用一部分额外空间存储其他内容。isa 指针第一位 indexed 为 1 即表示使用优化的 isa 指针
+    
+    // SUPPORT_NONPOINTER_ISA 用于标记是否支持优化的 isa 指针，其字面含义意思是 isa 的内容不再是类的指针了，而是包含了更多信息，比如 引用计数，析构状态，被其他 weak 变量引用情况。
+    
+#if SUPPORT_NONPOINTER_ISA  //支持非指针内容的isa 也就是支持优化了之后的isa 会将isa的高位标示一些标志
 
-    // extra_rc must be the MSB-most field (so it matches carry/overflow flags)
+    // extra_rc must be the MSB-most(指最高有效位) field (so it matches carry/overflow flags)
     // indexed must be the LSB (fixme or get rid of it)
     // shiftcls must occupy the same bits that a real class pointer would
     // bits + RC_ONE is equivalent to extra_rc + 1
     // RC_HALF is the high bit of extra_rc (i.e. half of its range)
 
+    // extra_rc 必须在最高的有效位
+    // indexed 必须在最低的位置
+    // 因为 RC_ONE 是 1ULL<<45 ，所以bits + RC_ONE 等于 extra_rc + 1  ？？？？？？
+    // RC_HALF（18位） 是 extra_rc（19位）能存储的最大数的一半  ？？？？？
+    
     // future expansion:
     // uintptr_t fast_rr : 1;     // no r/r overrides
     // uintptr_t lock : 2;        // lock for atomic property, @synch
     // uintptr_t extraBytes : 1;  // allocated with extra bytes
 
 # if __arm64__
-#   define ISA_MASK        0x0000000ffffffff8ULL
-#   define ISA_MAGIC_MASK  0x000003f000000001ULL
+#   define ISA_MASK        0x0000000ffffffff8ULL //说明 第0到63位中 第28位到第60位的内容存的是ISA真实的地址
+#   define ISA_MAGIC_MASK  0x000003f000000001ULL  //MSAK可以指明具体的存放位置
 #   define ISA_MAGIC_VALUE 0x000001a000000001ULL
     struct {
         uintptr_t indexed           : 1;
@@ -123,10 +144,21 @@ union isa_t
 
 };
 
+/*
+ objc.h中的objc_object定义
+ struct objc_object {
+ // 实际在objc_private.h中objc_object是没有Class isa这个字段的
+ // 有的只是isa_t isa这个私有的字段，代表对象类型的Class cls字段存储在 isa_t 结构体中
+ // Apple玩这么一手，轻易的就把底层实现给隐藏了
+ Class isa  OBJC_ISA_AVAILABILITY;
+ };
+ */
 
+//objc_object的定义：
 struct objc_object {
 private:
-    isa_t isa;
+    isa_t isa;  //isa 64位 中存了不少信息，包括对象的类型，引用计数和其他乱七八糟的 如上笔记
+                // 是 objc_object 结构体内唯一一个成员变量
 
 public:
 
@@ -164,7 +196,7 @@ public:
     void setWeaklyReferenced_nolock();
 
     // object may have -.cxx_destruct implementation?
-    bool hasCxxDtor();
+    bool hasCxxDtor();  // 对象是否有C++的析构函数
 
     // Optimized calls to retain/release methods
     id retain();
@@ -230,7 +262,7 @@ private:
     bool sidetable_present();
 #endif
 };
-
+//struct objc_object 定义结束
 
 #if __OBJC2__
 typedef struct method_t *Method;
@@ -351,10 +383,26 @@ __BEGIN_DECLS
    Assorted metadata precooked in the dyld shared cache.
    Never set for images outside the shared cache file itself.
 */
-   
+
+// Mach-O 格式全称为 Mach Object 文件格式的缩写，是 macOS/iOS 上可执行文件的格式
+// Mach-O 可以分为3个部分
+//     Header
+//     Segment
+//     Section
+// 而一个 Segment 是可以包含多个 Section 的，见配图 mach_o_segments.gif
+
+// 镜像应该指的就是可执行文件
 
 typedef struct header_info {
-    struct header_info *next;
+    
+    
+    struct header_info *next;//链表
+    
+    /* typedef struct mach_header_64 headerType;
+     * mach_header_64 的注释：The 64-bit mach header appears at the very beginning of the object file for 62-bit architectures.
+     （at the very beginning of  在……一开始的时候)
+     */
+    
     const headerType *mhdr;
     const objc_image_info *info;
     const char *fname;  // same as Dl_info.dli_fname
@@ -363,6 +411,7 @@ typedef struct header_info {
     bool allClassesRealized;
 
     // Do not add fields without editing ObjCModernAbstraction.hpp
+    //添加文件就需要编辑修改ObjCModernAbstraction.hpp文件
 
     bool isLoaded() {
         return loaded;
@@ -374,7 +423,7 @@ typedef struct header_info {
 
     bool isPreoptimized() const;
 
-#if !__OBJC2__
+#if !__OBJC2__ //非 Object-C 2.0
     struct old_protocol **proto_refs;
     struct objc_module *mod_ptr;
     size_t              mod_count;
@@ -433,7 +482,7 @@ extern SEL SEL_isDeallocating;
 extern SEL SEL_retainWeakReference;
 extern SEL SEL_allowsWeakReference;
 
-/* preoptimization */
+/* preoptimization */ //预先 优化
 extern void preopt_init(void);
 extern void disableSharedCacheOptimizations(void);
 extern bool isPreoptimized(void);
@@ -448,12 +497,49 @@ extern Class* copyPreoptimizedClasses(const char *name, int *outCount);
 
 extern Class _calloc_class(size_t size);
 
-/* method lookup */
-extern IMP lookUpImpOrNil(Class, SEL, id obj, bool initialize, bool cache, bool resolver);
-extern IMP lookUpImpOrForward(Class, SEL, id obj, bool initialize, bool cache, bool resolver);
+/* method lookup */  //方法 查找
 
-extern IMP lookupMethodInClassAndLoadCache(Class cls, SEL sel);
-extern bool class_respondsToSelector_inst(Class cls, SEL sel, id inst);
+// 如果没有找到的话，返回nil，而不是 _objc_msgForward_impcache，即不会进行消息转发
+// 实现在 objc-runtime-new.mm 文件中
+extern IMP lookUpImpOrNil(Class, SEL, id obj, bool initialize, bool cache, bool resolver);     //查询实现或者nil
+
+/***********************************************************************
+ * lookUpImpOrForward.
+ * The standard IMP lookup.
+ * initialize==NO tries to avoid +initialize (but sometimes fails)
+ * cache==NO skips optimistic（开放式）unlocked lookup (but uses cache elsewhere)
+ * Most callers should use initialize==YES and cache==YES.
+ * inst（也就是 obj） is an instance of cls or a subclass thereof, or nil if none is known.
+ *   If cls is an un-initialized metaclass then a non-nil inst is faster.
+ * May return _objc_msgForward_impcache. IMPs destined for external use
+ *   must be converted to _objc_msgForward or _objc_msgForward_stret.
+ *   If you don't want forwarding at all, use lookUpImpOrNil() instead.
+ **********************************************************************/
+// 标准的查找 IMP 的函数
+// 在 cls 类以及父类中寻找 sel 对应的 IMP，
+// initialize == NO 表示尝试避免触发 +initialize (但有时失败)，
+// cache == NO 表示跳过 optimistic unlocked lookup，即跳过前面不加锁的部分对缓存的查找，但是在 retry 里加锁的部分还是会优先查找缓存
+// 大多数调用者应该用 initialize==YES and cache==YES.
+// inst 是这个类的实例，或者它的子类的实例，也可能是 nil，
+// 如果这个类是一个不是 initialized 状态的元类，那么 obj 非空的话，会快一点，
+// resolver == YES 的话，如果在缓存和方法列表中都没有找到 IMP，就会进行 resolve，尝试动态添加方法
+// 有可能返回 _objc_msgForward_impcache。IMPs 被用作外部的使用时（转发？？），一定要转为 _objc_msgForward 或者 _objc_msgForward_stret
+// 如果确实不想转发，就用 lookUpImpOrNil() 代替
+// 实现在 objc-runtime-new.mm 文件中
+extern IMP lookUpImpOrForward(Class, SEL, id obj, bool initialize, bool cache, bool resolver); //查询实现或者转发
+
+
+// 在指定 Class 中搜索 sel 对应的 IMP，先在缓存中找，
+// 如果没有找到，再在 method list 里找，如果找到，就将 sel-IMP 对放入缓存中，并返回 IMP
+// 如果没有找到，就将 sel-_objc_msgForward_impcache 放入缓存中，
+// 并返回_objc_msgForward_impcache
+// 但是这个函数只用于 object_cxxConstructFromClass() 和 object_cxxDestructFromClass() 两个函数
+// 实现在 objc-runtime-new.mm 文件中
+extern IMP lookupMethodInClassAndLoadCache(Class cls, SEL sel);         //在类和加载缓存中查询方法实现
+
+// inst is an instance of cls or a subclass thereof, or nil if none is known.
+// Non-nil inst is faster in some cases. See lookUpImpOrForward() for details.
+extern bool class_respondsToSelector_inst(Class cls, SEL sel, id inst); //
 
 extern bool objcMsgLogEnabled;
 extern bool logMessageSend(bool isClassMethod,
@@ -461,13 +547,32 @@ extern bool logMessageSend(bool isClassMethod,
                     const char *implementingClass,
                     SEL selector);
 
-/* message dispatcher */
+/* message dispatcher */ //消息 分发派遣 还有消息转发呢
+
+
+/***********************************************************************
+ * _class_lookupMethodAndLoadCache.
+ * Method lookup for dispatchers ONLY. OTHER CODE SHOULD USE lookUpImp().
+ * This lookup avoids optimistic cache scan because the dispatcher
+ * already tried that.
+ 
+ 这个查找方法的函数只能被 dispatchers （也就是 objc_msgSend、objc_msgSend_stret 等函数）使用
+ 其他的代码应该使用 lookUpImp() 函数
+ 这个函数避免了扫描缓存，因为 dispatchers 已经尝试过扫描缓存了，正是因为缓存中没有找到，才调用这个方法找的
+ **********************************************************************/
+// 该方法会在 objc_msgSend 中，当在缓存中没有找到 sel 对应的 IMP 时被调用
+// objc-msg-arm.s 文件中 STATIC_ENTRY _objc_msgSend_uncached 里可以找到
+// 因为在调用这个方法之前，我们已经是从缓存无法找到这个方法了，所以这个方法避免了再去扫描缓存查找方法的过程，而是直接从方法列表找起。
 extern IMP _class_lookupMethodAndLoadCache3(id, SEL, Class);
 
+
+
 #if !OBJC_OLD_DISPATCH_PROTOTYPES
-extern void _objc_msgForward_impcache(void);
-extern void _objc_ignored_method(void);
-extern void _objc_msgSend_uncached_impcache(void);
+// 实现代码都在 objc-msg-arm.s 中
+
+extern void _objc_msgForward_impcache(void);       //消息转发
+extern void _objc_ignored_method(void);            //消息忽略
+extern void _objc_msgSend_uncached_impcache(void); //消息发送 不缓存
 #else
 extern id _objc_msgForward_impcache(id, SEL, ...);
 extern id _objc_ignored_method(id, SEL, ...);
@@ -485,6 +590,12 @@ extern bool crashlog_header_name(header_info *hi);
 extern bool crashlog_header_name_string(const char *name);
 
 /* magic */
+/***********************************************************************
+ * _objc_getFreedObjectClass.  Return a pointer to the dummy（假的） freed（释放的）
+ * object class.  Freed objects get their isa pointers replaced with
+ * a pointer to the freedObjectClass, so that we can catch usages of
+ * the freed object.（没有看明白）
+ **********************************************************************/
 extern Class _objc_getFreedObjectClass (void);
 
 /* map table additions */
@@ -495,15 +606,15 @@ extern void *NXMapKeyFreeingRemove(NXMapTable *table, const void *key);
 extern unsigned _NXHashCapacity(NXHashTable *table);
 extern void _NXHashRehashToCapacity(NXHashTable *table, unsigned newCapacity);
 
-/* property attribute parsing */
+/* property attribute parsing */ //成员变量属性 解析
 extern const char *copyPropertyAttributeString(const objc_property_attribute_t *attrs, unsigned int count);
 extern objc_property_attribute_t *copyPropertyAttributeList(const char *attrs, unsigned int *outCount);
 extern char *copyPropertyAttributeValue(const char *attrs, const char *name);
 
-/* locking */
+/* locking */  //锁
 extern void lock_init(void);
 extern rwlock_t selLock;
-extern mutex_t cacheUpdateLock;
+extern mutex_t cacheUpdateLock;   // 用户方法缓存更新时的互斥锁
 extern recursive_mutex_t loadMethodLock;
 #if __OBJC2__
 extern rwlock_t runtimeLock;
@@ -512,11 +623,20 @@ extern mutex_t classLock;
 extern mutex_t methodListLock;
 #endif
 
+
+// 用这个类包装 monitor_t 类的对象的意义是，在构造函数中会自动调用 lock.enter() 给互斥量加锁
+// 而在析构时，会自动调用 lock.leave() 给互斥量解锁
+// 就省了每次都要小心翼翼的检查 lock.leave()，如果忘了写，会很麻烦，而且 BUG 不好排查
+// 另一点更保证了安全，就是 monitor_locker_t 继承自 nocopy_t 类
+// 父类 nocopy_t 是不能被拷贝的类，因为没有拷贝构造函数
+// 所以，monitor_t 锁被封装在 monitor_locker_t 中非常安全
+
+//monitor_t 锁被封装在 monitor_locker_t  monitor_locker_t 是不可复制的
 class monitor_locker_t : nocopy_t {
     monitor_t& lock;
   public:
     monitor_locker_t(monitor_t& newLock) : lock(newLock) { lock.enter(); }
-    ~monitor_locker_t() { lock.leave(); }
+    ~monitor_locker_t() { lock.leave(); }  //析构函数？？
 };
 
 class mutex_locker_t : nocopy_t {
@@ -527,6 +647,7 @@ class mutex_locker_t : nocopy_t {
     ~mutex_locker_t() { lock.unlock(); }
 };
 
+//递归锁 可以递归上锁 不会引起思索 上了锁 之后又上一层锁
 class recursive_mutex_locker_t : nocopy_t {
     recursive_mutex_t& lock;
   public:
@@ -535,6 +656,7 @@ class recursive_mutex_locker_t : nocopy_t {
     ~recursive_mutex_locker_t() { lock.unlock(); }
 };
 
+//读写锁 读锁
 class rwlock_reader_t : nocopy_t {
     rwlock_t& lock;
   public:
@@ -542,6 +664,7 @@ class rwlock_reader_t : nocopy_t {
     ~rwlock_reader_t() { lock.unlockRead(); }
 };
 
+//读写锁  写锁
 class rwlock_writer_t : nocopy_t {
     rwlock_t& lock;
   public:
@@ -650,13 +773,19 @@ extern void logReplacedMethod(const char *className, SEL s, bool isMeta, const c
 
 
 // objc per-thread storage
+// 线程数据 结构体 _objc_pthread_data 的定义
+
 typedef struct {
     struct _objc_initializing_classes *initializingClasses; // for +initialize
     struct SyncCache *syncCache;  // for @synchronize
     struct alt_handler_list *handlerList;  // for exception alt handlers
     char *printableNames[4];  // temporary demangled names for logging
+    // 数组，存储需要打印的类取消重整的名字，
+    // 是一个 FIFO 的队列，有新的元素进来时，会将第一个元素释放，然后后面的元素向前挪一个单位，
+    // 再把新来的元素放在末尾
 
-    // If you add new fields here, don't forget to update 
+
+    // If you add new fields here, don't forget to update
     // _objc_pthread_destroyspecific()
 
 } _objc_pthread_data;
@@ -680,7 +809,7 @@ extern void _destroySyncCache(struct SyncCache *cache);
 extern void arr_init(void);
 extern id objc_autoreleaseReturnValue(id obj);
 
-// block trampolines
+// block trampolines(蹦床 意译)
 extern IMP _imp_implementationWithBlockNoCopy(id block);
 
 // layout.h
@@ -776,16 +905,44 @@ static __inline uint32_t _objc_strhash(const char *s) {
 
 #if __cplusplus
 
+// 计算 x 的 log2(x)，并取下限
+/*
+ x       x  log2(x)
+ 0 -     0 - 0
+ 1 -     1 - 0
+ 2 -    10 - 1
+ 3 -    11 - 1
+ 4 -   100 - 2
+ 5 -   101 - 2
+ 6 -   110 - 2
+ 7 -   111 - 2
+ 8 -  1000 - 3
+ 9 -  1001 - 3
+ 10 -  1010 - 3
+ 11 -  1011 - 3
+ 12 -  1100 - 3
+ 13 -  1101 - 3
+ 14 -  1110 - 3
+ 15 -  1111 - 3
+ 16 - 10000 - 4
+ 17 - 10001 - 4
+ 18 - 10010 - 4
+ 19 - 10011 - 4
+ */
+
+//用这个干什么呢？？？
+
+//用递归的方法实现计算log2(x)并且取下限，就是看 x 有多少位二进制嘛 ， 那就每次向右移动一位
 template <typename T>
 static inline T log2u(T x) {
     return (x<2) ? 0 : log2u(x>>1)+1;
 }
-
+//这个是求2的x次方是多少，那就每次左移一位
 template <typename T>
 static inline T exp2u(T x) {
     return (1 << x);
 }
-
+//这个是求2的x次方- 1 是多少
 template <typename T>
 static T exp2m1u(T x) { 
     return (1 << x) - 1; 
@@ -793,7 +950,7 @@ static T exp2m1u(T x) {
 
 #endif
 
-
+//全局的操作 new 和 删除 一定要确保 在任何一个APP中不能重写这些方法 并且要求 任何一个必须存在lib库？？？？
 // Global operator new and delete. We must not use any app overrides.
 // This ALSO REQUIRES each of these be in libobjc's unexported symbol list.
 #if __cplusplus
@@ -835,24 +992,37 @@ class TimeLogger {
 // for cache-friendly lock striping. 
 // For example, this may be used as StripedMap<spinlock_t>
 // or as StripedMap<SomeStruct> where SomeStruct stores a spin lock.
-template<typename T>
+
+
+// 条纹图
+// 为什么叫条纹图呢，因为内存被分割成了一条一条的
+// 就像这样 | 64bits | 64bits | 64bits | 64bits | 64bits | 64bits | 64bits | 64bits | ....
+// 一共有 64 块，每块的大小是 64 的整数倍
+
+template<typename T>  //泛型
 class StripedMap {
 
     enum { CacheLineSize = 64 };
 
-#if TARGET_OS_EMBEDDED
+#if TARGET_OS_EMBEDDED //嵌入
     enum { StripeCount = 8 };
 #else
     enum { StripeCount = 64 };
 #endif
 
     struct PaddedT {
+        
+        // 一个名称为value的变量，类型是T，并且内存以 CacheLineSize 对齐
+        // 即占用内存大小是 CacheLineSize 的整数倍
         T value alignas(CacheLineSize);
     };
 
+    // 最重要的存数据的数组，元素个数是StripeCount
     PaddedT array[StripeCount];
 
     static unsigned int indexForPointer(const void *p) {
+        
+        // 根据指针 p 存的对象的地址，计算对象在哪个 side table
         uintptr_t addr = reinterpret_cast<uintptr_t>(p);
         return ((addr >> 4) ^ (addr >> 9)) % StripeCount;
     }
@@ -881,6 +1051,9 @@ class StripedMap {
 // stored value is disguised to hide it from tools like `leaks`.
 // nil is disguised as itself so zero-filled memory works as expected, 
 // which means 0x80..00 is also diguised as itself but we don't care
+
+// 将指针伪装成 DisguisedPtr 类型，可以防止 leaks 报内存泄漏
+
 template <typename T>
 class DisguisedPtr {
     uintptr_t value;

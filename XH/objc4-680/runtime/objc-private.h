@@ -105,10 +105,10 @@ union isa_t
 #   define ISA_MAGIC_VALUE 0x000001a000000001ULL // 初始化的 bits 值，其中 magic 初始化为 011010
                                                  // indexed 被初始化为 1，其他位均被初始化为 0
     struct {
-        uintptr_t indexed           : 1; // 0表示普通的isa指针 1表示优化过的，存储引用计数
-        uintptr_t has_assoc         : 1; // 对象是否包含 associated object，如果没有，析构时会更快
-        uintptr_t has_cxx_dtor      : 1; // 是否有C++或ARC的析构函数，如果没有，析构时会更快
-        uintptr_t shiftcls          : 33; // 最重要的原来的Class cls部分，占33个bit，与 ISA_MASK 进行 & 操作可以得到  // MACH_VM_MAX_ADDRESS 0x1000000000
+        uintptr_t indexed           : 1; //最后一位 0表示普通的isa指针 1表示优化过的，存储引用计数
+        uintptr_t has_assoc         : 1; //从右往左 第二位 对象是否包含 associated object，如果没有，析构时会更快
+        uintptr_t has_cxx_dtor      : 1; //从右往左 第三位 是否有C++或ARC的析构函数，如果没有，析构时会更快
+        uintptr_t shiftcls          : 33; //从右往左 一共33位 根据ISA_MASK推算出来的位置 最重要的原来的Class cls部分，占33个bit，与 ISA_MASK 进行 & 操作可以得到  // MACH_VM_MAX_ADDRESS 0x1000000000
         uintptr_t magic             : 6; // 用于调试时分辨对象是否完成初始化
         uintptr_t weakly_referenced : 1; // 对象是否有过weak引用，如果没有，析构时会更快
         uintptr_t deallocating      : 1; // 对象是否正在析构
@@ -185,11 +185,11 @@ public:
     bool isClass(); // 判断是否是类，类也是一种对象
 
     // object may have associated objects?
-    bool hasAssociatedObjects();    // 判断对象是否是否有关联的对象
+    bool hasAssociatedObjects();    // 判断对象是否是否有关联的对象--取isa中对应位的值判断
     void setHasAssociatedObjects(); // 设置有关联的对象
 
     // object may be weakly referenced?
-    bool isWeaklyReferenced();   // 对象是否有被弱引用
+    bool isWeaklyReferenced();   // 对象是否有被弱引用--取isa中对应位的值判断
     void setWeaklyReferenced_nolock();  // 设置对象有被弱引用
 
     // object may have -.cxx_destruct implementation?
@@ -225,7 +225,7 @@ private:
                            // extra data in the isa field
                            // 可以在 isa 中存其他的数据，见 isa_t
     
-    // Unified retain count manipulation for nonpointer isa
+    // Unified（统一） retain count manipulation（手工） for nonpointer isa（优化过的isa）
     id rootRetain(bool tryRetain, bool handleOverflow);
     bool rootRelease(bool performDealloc, bool handleUnderflow);
     id rootRetain_overflow(bool tryRetain);
@@ -275,10 +275,11 @@ private:
 
 
 #if __OBJC2__ // Objective-C 2.0
-typedef struct method_t *Method;
-typedef struct ivar_t *Ivar;
-typedef struct category_t *Category;
-typedef struct property_t *objc_property_t;
+
+typedef struct method_t *Method;               //方法 列表/数组 指针 指向一个 method_t 类型的的指针 是一个 列表 或者 数组 里面存了每一个方法
+typedef struct ivar_t *Ivar;                   //变量链表或者数组 指向一个变量列表或者数组的指针 存储了所有的变量
+typedef struct category_t *Category;           //分类列表
+typedef struct property_t *objc_property_t;    //成员属性列表
 #else  // 老的，不用去看
 typedef struct old_method *Method;
 typedef struct old_ivar *Ivar;
@@ -914,6 +915,7 @@ static __inline uint32_t _objc_strhash(const char *s) {
 
 // 计算 x 的 log2(x)，并取下限
 /*
+  x       x  log2(x)
   0 -     0 - 0
   1 -     1 - 0
   2 -    10 - 1

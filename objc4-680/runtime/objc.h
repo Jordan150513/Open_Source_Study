@@ -115,7 +115,7 @@ typedef signed char BOOL;
 
 #ifndef Nil
 # if __has_feature(cxx_nullptr)
-#   define Nil nullptr
+#   define Nil nullptr    //也就是说  nil 就是 nullptr
 # else
 #   define Nil __DARWIN_NULL
 # endif
@@ -123,7 +123,7 @@ typedef signed char BOOL;
 
 #ifndef nil
 # if __has_feature(cxx_nullptr)
-#   define nil nullptr
+#   define nil nullptr  //也就是说  nil 就是 nullptr
 # else
 #   define nil __DARWIN_NULL
 # endif
