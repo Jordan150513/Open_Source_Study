@@ -49,7 +49,7 @@ private:
 public:
     // 取得 key
     inline cache_key_t key() const {
-        return _key;
+        return _key;    //是不是就是一个地址？？？ cache_key_t 就是一个无符号的unsigned long ，SEL 也就是 objc_select 本质上是一个 char * 字符串
     }
     // 取得 IMP
     inline IMP imp() const {
@@ -64,7 +64,7 @@ public:
         _imp = newImp;
     }
     // 同时设置 key 和 IMP，
-    // 因为不同的平台的实现不一样，所以没写在这里，实现在 objc-cache.mm 里
+    // 因为不同的平台的实现不一样，所以没写在这里，实现在 objc-cache.mm 里0--------------需要核实连接----------
     // 同时设置 key 和 IMP，需要保证原子性(atomic)，所以用了汇编，这个很有意思
     void set(cache_key_t newKey, IMP newImp);
 };
@@ -72,7 +72,7 @@ public:
 #pragma mark - cache_t
 
 // 缓存结构体，被用在了 objc_class 中
-// 方法实现都在 objc-cache.mm 中
+// 方法实现都在 objc-cache.mm 中 ------ 需要核实连接-----------------
 
 struct cache_t {
     struct bucket_t *_buckets; // 存数据的，用数组表示的 hash 表
@@ -117,8 +117,10 @@ public:
     
     // _buckets 数组中存入新的 bucket 时，寻找第一个没有用过的 bucket
     // 或者命中 key 的 bucket，来存新的 bucket
-    // 注意，objc_msgSend 中进行对类的方法缓存进行查找的实现在 objc-msg-arm.s 文件中的
+    // 注意，objc_msgSend 中进行对类的方法缓存进行查找的实现在 objc-msg-arm.s 文件中的-----------------需要核实连接-----------
     //     .macro CacheLookup 中，并不是这里的 find() 方法
+    
+    //那这个find()是干什么的？ 槽 bucket又是干什么的？？ 槽是用来存缓存的？？？
     struct bucket_t * find(cache_key_t key, id receiver);
     
     // cache 出现错误，打印错误信息，然后程序挂掉
@@ -138,7 +140,7 @@ typedef struct classref * classref_t; // classref_t 是 unremapped 的类 类型
 *
 * Element is the struct type (e.g. method_t)
 * List is the specialization of entsize_list_tt (e.g. method_list_t)
-* FlagMask is used to stash extra bits in the entsize field
+* FlagMask is used to stash(隐藏) extra bits in the entsize field
 *   (e.g. method list fixup markers)
 **********************************************************************/
 // entsize_list_tt 可以理解为一个容器，拥有自己的迭代器用于遍历所有元素。
@@ -150,7 +152,7 @@ struct entsize_list_tt {
     // entsize 就是每个元素的大小
     uint32_t entsizeAndFlags;
     uint32_t count; // 元素的总数
-    Element first;  // 第一个元素，其他的元素紧跟在其后面
+    Element first;  // 第一个元素，其他的元素紧跟在其后面 是一个是数组
 
     // 取出 entsize
     uint32_t entsize() const {
@@ -210,7 +212,7 @@ struct entsize_list_tt {
         return iterator(*static_cast<const List*>(this), count); 
     }
 
-    // 向前声明
+    // 向前声明 迭代器
     struct iterator {
         uint32_t entsize; // 元素的大小
         uint32_t index;  // 当前的索引  // keeping track of this saves a divide in operator-
@@ -223,7 +225,7 @@ struct entsize_list_tt {
         typedef Element* pointer;    // 指针类型
         typedef Element& reference;  // 引用类型
 
-        iterator() { }   // 默认的空的构造函数
+        iterator() { }   // 默认的空的构造函数 同名的是构造函数 ~的是析构函数
 
         // 真正有用的构造函数，参数 list 是迭代器用在哪个 List 上
         // start 是当前的索引

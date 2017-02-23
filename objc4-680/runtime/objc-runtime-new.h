@@ -25,14 +25,17 @@
 #define _OBJC_RUNTIME_NEW_H
 
 #if __LP64__
-typedef uint32_t mask_t;  // x86_64 & arm64 asm are less efficient with 16-bits
+typedef uint32_t mask_t; // unsigned int  32 位 // x86_64 & arm64 asm are less efficient with 16-bits
 #else
-typedef uint16_t mask_t;
+typedef uint16_t mask_t; // unsigned short 16 位
 #endif
-typedef uintptr_t cache_key_t;
+typedef uintptr_t cache_key_t; // 也就是 unsigned long
 
 struct swift_class_t;
 
+#pragma mark - bucket_t
+// cache_t 中存的实体，单一的一个 key - value 对
+// bucket 可以翻译为 槽
 
 struct bucket_t {
 private:
