@@ -115,7 +115,7 @@ bool weak_is_registered_no_lock(weak_table_t *weak_table, id referent);
 #endif
 
 /// Assert a weak pointer is valid and retain the object during its use.
-// 我猜是查找 referrer 所指向的 referent
+// 我猜是查找 referrer(索引) 所指向的 referent(索引对象)
 // referrer 存有对象，但并不代表 referrer 对这个对象有弱引用，所以需要去 weak table 中查是否真的有弱引用关系
 id weak_read_no_lock(weak_table_t *weak_table, id *referrer);
 
