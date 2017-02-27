@@ -143,7 +143,7 @@ typedef struct classref * classref_t; // classref_t 是 unremapped 的类 类型
 * FlagMask is used to stash(隐藏) extra bits in the entsize field
 *   (e.g. method list fixup markers)
 **********************************************************************/
-// entsize_list_tt 可以理解为一个容器，拥有自己的迭代器用于遍历所有元素。
+// entsize_list_tt 可以理解为一个容器，拥有自己的迭代器用于遍历所有元素。-- 是  method_list_t 继承自该类
 // Element 表示元素类型，List 用于指定容器类型，
 // 最后一个参数为标记位, 用来在 entsize field 里存放一些额外的 bits，也就是 flags
 template <typename Element, typename List, uint32_t FlagMask>
@@ -212,7 +212,7 @@ struct entsize_list_tt {
         return iterator(*static_cast<const List*>(this), count); 
     }
 
-    // 向前声明 迭代器
+    // 向前声明 迭代器 --- 方法表和属性表 和成员变量表都继承自这个迭代器 所以是为了遍历寻找方法和成员属性的基础功能
     struct iterator {
         uint32_t entsize; // 元素的大小
         uint32_t index;  // 当前的索引  // keeping track of this saves a divide in operator-
@@ -225,7 +225,7 @@ struct entsize_list_tt {
         typedef Element* pointer;    // 指针类型
         typedef Element& reference;  // 引用类型
 
-        iterator() { }   // 默认的空的构造函数 同名的是构造函数 ~的是析构函数
+        iterator() { }   // 默认的空的构造函数 同名的是构造函数 ~的是析构函数：析构函数的作用是完成一个清理工作，如释放从堆中分配的内存
 
         // 真正有用的构造函数，参数 list 是迭代器用在哪个 List 上
         // start 是当前的索引
@@ -235,12 +235,12 @@ struct entsize_list_tt {
             , element(&list.getOrEnd(start))  // 保存当前的元素的地址
         { }
 
-        // 迭代器向后移动 delta 个位置
+        // 迭代器向后移动 delta 个位置  重构操作符+=
         const iterator& operator += (ptrdiff_t delta) {
             // 计算出新元素的地址，保存起来
-            element = (Element*)((uint8_t *)element + delta*entsize);
+            element = (Element*)((uint8_t *)element + delta*entsize);//计算出推迟delta个元素之后的指针的位置
             // 索引也加上 delta
-            index += (int32_t)delta;
+            index += (int32_t)delta;//索引也跟着更改
             return *this;
         }
         // 与 += 相反，迭代器向前移动 delta 个位置
@@ -317,11 +317,11 @@ struct entsize_list_tt {
 
 #pragma mark - method_t
 
-// 方法结构体
+// 方法结构体 --- 一个方法的存储单元  在方法列表method_list_t里存储若干个 method_t
 struct method_t {
-    SEL name;          // 方法名，就是 SEL
+    SEL name;          // 方法名，就是 SEL ： selector的简写
     const char *types; // 方法类型字符串，有的地方又称 method signature 方法签名
-    IMP imp;           // 指向方法的函数实现的指针
+    IMP imp;           // 指向方法的函数实现的指针---很重要 有大文章
     
     /* 
        一个结构体，用来做排序 Sort by selector address.
@@ -361,7 +361,7 @@ struct ivar_t {
     const char *name; // 成员变量名  比如 "_name"
     const char *type; // 成员变量的类型 比如 "@\"NSString\""
     // alignment is sometimes -1; use alignment() instead
-    uint32_t alignment_raw; // 对齐
+    uint32_t alignment_raw; // 对齐 alignment：成一线
     uint32_t size;  // 成员变量占多少内存
 
     // 取得对齐的值（即以多少字节对齐），因为 alignment_raw 有时为 -1，alignment() 会进行纠正，返回正确的值
@@ -377,7 +377,7 @@ struct ivar_t {
 
 #pragma mark - property_t
 
-// 属性结构体
+// 属性结构体 --属性和成员变量的区别  属性是在堆中 成员变量在哪里？
 struct property_t {
     const char *name;  // 属性名，堆中分配
     const char *attributes; // 属性的特性字符串，标识了属性有哪些特性
@@ -390,6 +390,7 @@ struct property_t {
 // 方法列表，是一个容器，继承自 entsize_list_tt，
 // 元素类型是 method_t ，容器类型是 method_list_t
 // 该列表是值类型的
+//<method_t, method_list_t, 0x3>是什么意思呢？？？需要确定为啥会这样呢？------------qd--------需要回头核实------------
 struct method_list_t : entsize_list_tt<method_t, method_list_t, 0x3> { // 0x3 就是 0b11
                                                                        // 即 flag 占 2 个 bit，用来放 fixedup markers
     
@@ -430,7 +431,7 @@ typedef uintptr_t protocol_ref_t;  // protocol_t *, but unremapped
                                     // 取标识 fixed-up 位的掩码，这里取到的就是最高的 2 位
 
 // 协议结构体，继承自 objc_object
-struct protocol_t : objc_object {
+struct protocol_t : objc_object {//mangle:压碎
     const char *mangledName;    // 重整后的协议名称，为了兼容 swift 协议而准备的，
                                 // 它在 objc_allocateProtocol() 中被赋值，
                                 // 普通 oc 的协议重整前后的名字是一样的，而 swift 的协议重整前后名字不一样，
@@ -501,7 +502,7 @@ struct protocol_list_t {
     uintptr_t count;  // 列表中协议的总数
     protocol_ref_t list[0]; // variable-size
                 // 列表的首地址，列表中存的元素是 protocol_ref_t 结构体对象的地址，
-                // protocol_ref_t 与 protocol_t * 一模一样，但是用于未重映射的协议
+                // protocol_ref_t 与 protocol_t * 一模一样，但是用于未重映射的协议------- 什么是 未重映射 的协议---------？？？--重整后的协议名称，为了兼容 swift 协议而准备的？？是这个吗？-------
 
     // 对象本身和所存储的所有协议的总大小
     size_t byteSize() const {
@@ -560,7 +561,7 @@ struct locstamped_category_list_t {
 // class_data_bits_t is the class_t->data field (class_rw_t pointer plus flags)
 // The extra bits are optimized for the retain/release and alloc/dealloc paths.
 
-// ---------- class_ro_t 用的 ------------
+// ---------- class_ro_t 用的 -------一共32位---编译器会设置这些---read 执行？operate？--
 
 // Values for class_ro_t->flags
 // These are emitted by the compiler（是编译器发出的） and are part of the ABI.
@@ -592,7 +593,7 @@ struct locstamped_category_list_t {
 // class is realized - must never be set by compiler
 #define RO_REALIZED           (1<<31) // 类是否已经被 realized
 
-// ---------- class_rw_t 用的 ------------
+// ---------- class_rw_t 用的 ------read write------
 
 // Values for class_rw_t->flags
 // These are not emitted by the compiler（不是编译器发出的） and are never used in class_ro_t.
@@ -686,7 +687,7 @@ struct locstamped_category_list_t {
 // data pointer
 #define FAST_DATA_MASK          0x00007ffffffffff8UL // 存 rw 的地址的位置
 
-#else    // 靠，上面是 #elif 1 ，这个 #else 会走 ？？？？
+#else    // 靠，上面是 #elif 1 ，这个 #else 会走 ？？？？----不会走
 
 // Leaks-incompatible version that steals lots of bits.
 
@@ -783,7 +784,7 @@ struct _protocol_t;
 
 struct _objc_method {
     struct objc_selector * _cmd;
-    const char *method_type;
+    const char *method_type;---------method Type是什么？？
     void  *_imp;
 };
 
@@ -803,13 +804,13 @@ struct _protocol_t {
 
 struct _ivar_t {
     unsigned long int *offset;  // pointer to ivar offset location
-    const char *name;
-    const char *type;
+    const char *name; soufunid之类
+    const char *type;----NSString，int...之类
     unsigned int alignment;
     unsigned int  size;
 };
 
-struct _class_ro_t {
+struct _class_ro_t {//ro--readonly??好像不是
     unsigned int flags;
     unsigned int instanceStart;
     unsigned int instanceSize;
@@ -1002,7 +1003,7 @@ struct class_ro_t {
 
 /***********************************************************************
 * list_array_tt<Element, List>
-* Generic implementation for metadata that can be augmented by categories.
+ * Generic （| BrE dʒɪˈnɛrɪk, AmE dʒəˈnɛrɪk |普通的）implementation for metadata that can be augmented（增加） by categories.
 *
 * Element is the underlying metadata type (e.g. method_t)
 * List is the metadata's list type (e.g. method_list_t)
@@ -1266,12 +1267,12 @@ class protocol_array_t :
 // RW 就是 Read Write 可读可写
 struct class_rw_t {
     
-    uint32_t flags; // 存了是否有 C++ 构造器、C++ 析构器、默认 RR 等信息
+    uint32_t flags; // 存了是否有 C++ 构造器、C++ 析构器、默认 RR 、是否已经被 Realized等信息
     
     uint32_t version; // 版本，元类是 7，普通类是 0，见 objc_initializeClassPair_internal()
 
     const class_ro_t *ro; // 指向 ro 的指针，ro 中存储了当前类在编译期就已经确定的属性、方法以及遵循的协议
-                          // 成员变量也在其中
+                          // 成员变量也在其中 是否是元类
 
     method_array_t methods;  // 方法列表数组，每个元素是一个指针，指向一个方法列表 method_list_t，
                              // 前面是分类方法列表，一个分类一个列表，base methods list放在最后
@@ -1685,7 +1686,7 @@ struct objc_class : objc_object {
     bool hasCustomAWZ() {
         return ! bits.hasDefaultAWZ();
     }
-    // 设置本类以及其所有的子类有自定义的 AWZ - allocWithZone/alloc，这是在元类的 bits 中存的
+    // 设置本类以及其所有的子类有默认的 AWZ （没有自定义的）- allocWithZone/alloc，这是在元类的 bits 中存的
     void setHasDefaultAWZ() {
         assert(isInitializing());
         bits.setHasDefaultAWZ();
@@ -1713,7 +1714,7 @@ struct objc_class : objc_object {
     }
     // 是否可以快速 alloc
     bool canAllocFast() {
-        assert(!isFuture());
+        assert(!isFuture());//是future类就不可以进行快速alloc
         return bits.canAllocFast();
     }
 
@@ -1724,14 +1725,14 @@ struct objc_class : objc_object {
         return bits.hasCxxCtor();
     }
     // 设置有 C++ 构造器
-    void setHasCxxCtor() { 
+    void setHasCxxCtor() { //Construction
         bits.setHasCxxCtor();
     }
 
     // 有 C++ 析构器
-    bool hasCxxDtor() {
+    bool hasCxxDtor() {  //Destruction
         // addSubclass() propagates this flag from the superclass.
-        assert(isRealized());
+        assert(isRealized()); //Realized（实现了的） 才会有可能有
         return bits.hasCxxDtor();
     }
     // 设置有 C++ 析构器

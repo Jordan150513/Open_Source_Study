@@ -24,41 +24,45 @@
 #ifndef _OBJC_RUNTIME_NEW_H
 #define _OBJC_RUNTIME_NEW_H
 
+//根据(不同位数的)系统，设置mask_t 分别是什么类型 如果是64位 就是uint32_t，也就是unsigned int（无符号整数），
+//或者是uint16_t == unsigned short，或者是uintptr_t==unsigned long
 #if __LP64__
-typedef uint32_t mask_t; // unsigned int  32 位 // x86_64 & arm64 asm are less efficient with 16-bits
+typedef uint32_t mask_t; // unsigned int  32 位 // x86_64 & arm64 asm are less efficient with 16-bits  //unsigned int == uint32_t
 #else
 typedef uint16_t mask_t; // unsigned short 16 位
 #endif
-typedef uintptr_t cache_key_t; // 也就是 unsigned long
+typedef uintptr_t cache_key_t; // 也就是 unsigned long 64位？？
 
-struct swift_class_t;
+
+struct swift_class_t; //向前声明，具体的定义在L1238
 
 #pragma mark - bucket_t
 // cache_t 中存的实体，单一的一个 key - value 对
 // bucket 可以翻译为 槽
 
+//（槽）bucket_t结构体的定义  在下面cache_t结构体中使用，作为其成员
 struct bucket_t {
 private:
-    cache_key_t _key;
-    IMP _imp;
+    cache_key_t _key; //cache_key_t 类型的 _key,也就是unsigned long（无符号长整形的）_key
+    IMP _imp;         //IMP指针类型的_imp
 
-public:
-    inline cache_key_t key() const { return _key; }
-    inline IMP imp() const { return (IMP)_imp; }
-    inline void setKey(cache_key_t newKey) { _key = newKey; }
-    inline void setImp(IMP newImp) { _imp = newImp; }
+public://提供给结构体外界的使用接口，存取结构体中的成员
+    inline cache_key_t key() const { return _key; }          //获取本结构体中的cache_key_t（unsigned long）类型的key
+    inline IMP imp() const { return (IMP)_imp; }             //获取IMP指针
+    inline void setKey(cache_key_t newKey) { _key = newKey; }//设置key
+    inline void setImp(IMP newImp) { _imp = newImp; }        //设置IMP
 
-    void set(cache_key_t newKey, IMP newImp);
+    void set(cache_key_t newKey, IMP newImp);                //IMP和key一起设置
 };
 
-
+//定义结构体 cache_t
 struct cache_t {
-    struct bucket_t *_buckets;
-    mask_t _mask;
-    mask_t _occupied;
+    struct bucket_t *_buckets;  //一个指向（槽）bucket_t结构体类型的指针
+    mask_t _mask;               // 16位或者32位的一个mask
+    mask_t _occupied;           //16位或者32位的一个_occupied
 
 public:
-    struct bucket_t *buckets();
+    struct bucket_t *buckets();         //
     mask_t mask();
     mask_t occupied();
     void incrementOccupied();
