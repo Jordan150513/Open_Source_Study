@@ -147,7 +147,7 @@ namespace {
 // DenseMap 模板的三个参数：
 //     DisguisedPtr<objc_object> : 稠密图里的 key 的类型，是经过伪装后的 objc_object 指针
 //     size_t : 稠密图里的 value 的类型
-//     true   : 代表 Zero Values Are Purgeable 看字面意思是零值可以被清除
+//     true   : 代表 Zero Values Are Purgeable（可清洗 可清除） 看字面意思是零值可以被清除
 typedef objc::DenseMap<DisguisedPtr<objc_object>,size_t,true> RefcountMap;
 
 //  SideTable 这个类，它用于管理引用计数表和弱引用表，并使用 spinlock_lock 自旋锁来防止操作表结构时可能的竞态条件。
@@ -156,11 +156,12 @@ struct SideTable {
     RefcountMap refcnts; // 用来记录引用计数、是否有弱引用、是否在 dealloc 等信息
     weak_table_t weak_table;  // 弱引用表，存了弱引用对象，以及指向它的弱引用们
 
-    SideTable() {
+    SideTable() {  //构造函数
         // 将 weak_table 所在区域的内存清零
         memset(&weak_table, 0, sizeof(weak_table));
     }
 
+    //析构函数
     // side table 对象常驻内存，不能删除 ？
     ~SideTable() {
         _objc_fatal("Do not delete SideTable.");
@@ -177,7 +178,7 @@ struct SideTable {
     template<bool HaveOld, bool HaveNew>
     static void unlockTwo(SideTable *lock1, SideTable *lock2);
 };
-
+//SideTable 结构体 结束
 
 template<>
 void SideTable::lockTwo<true, true>(SideTable *lock1, SideTable *lock2) {
@@ -295,11 +296,12 @@ objc_storeStrong(id *location, id obj)
     if (obj == prev) {
         return;
     }
-    // 先 retain 新值，使新值引用计数 +1
+//    ------ strong强引用-----的具体操作----------qdd--------
+    // 先 retain 新值（新对象），使新值引用计数 +1
     objc_retain(obj);
     // location 指向新值
     *location = obj;
-    // release 旧值，使旧值引用计数 -1
+    // release 旧值（旧对象），使旧值引用计数 -1
     objc_release(prev);
 }
 
@@ -429,7 +431,7 @@ storeWeak(id *location, objc_object *newObj)
 
     return (id)newObj;
 }
-
+// location 指针弱引用 newObj 结束
 
 /** 
  * This function stores a new value into a __weak variable. It would
@@ -446,7 +448,7 @@ id
 objc_storeWeak(id *location, id newObj)
 {
 
-    return storeWeak<true/*old*/,
+    return storeWeak<true/*old*/,    //调用上面的weak store方法
                     true/*new*/,
                     true/*crash*/>
         (location, (objc_object *)newObj);
@@ -490,6 +492,7 @@ objc_storeWeakOrNil(id *location, id newObj)
  * @param newObj Object ptr. 
  */
 // location 弱引用 newObj，location 之前没有弱引用其他对象
+//初始化 weak引用
 id
 objc_initWeak(id *location, id newObj)
 {

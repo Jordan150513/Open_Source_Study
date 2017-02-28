@@ -34,12 +34,15 @@
 #ifndef OBJC_SUPER
 #define OBJC_SUPER
 
-/// Specifies the superclass of an instance. 
+//objc_super 结构体的定义
+/// Specifies（具体说明） the superclass of an instance.
 struct objc_super {
     /// Specifies an instance of a class.
+    //具体说明 一个类的实例
     __unsafe_unretained id receiver;
 
-    /// Specifies the particular superclass of the instance to message. 
+    /// Specifies the particular superclass of the instance to message.
+    //具体说明  消息实例的 特殊的父类
 #if !defined(__cplusplus)  &&  !__OBJC2__
     /* For compatibility with old objc-runtime.h header */
     __unsafe_unretained Class class;
@@ -48,31 +51,38 @@ struct objc_super {
 #endif
     /* super_class is the first class to search */
 };
+//objc_super 结构体的定义
 #endif
 
 
-/* Basic Messaging Primitives
+/* Basic Messaging Primitives(原始的)
  *
  * On some architectures, use objc_msgSend_stret for some struct return types.
  * On some architectures, use objc_msgSend_fpret for some float return types.
  * On some architectures, use objc_msgSend_fp2ret for some float return types.
  *
+    结构体返回类型的 用 objc_msgSend_stret
+    浮点数返回类型的 用 objc_msgSend_fpret
+  还有一些 浮点数返回类型的 用 objc_msgSend_fp2ret
  * These functions must be cast to an appropriate function pointer type 
  * before being called. 
  */
 #if !OBJC_OLD_DISPATCH_PROTOTYPES
-OBJC_EXPORT void objc_msgSend(void /* id self, SEL op, ... */ )
+OBJC_EXPORT void objc_msgSend(void /* id self, SEL op, ... */ )         //消息的发送
     __OSX_AVAILABLE_STARTING(__MAC_10_0, __IPHONE_2_0);
-OBJC_EXPORT void objc_msgSendSuper(void /* struct objc_super *super, SEL op, ... */ )
+OBJC_EXPORT void objc_msgSendSuper(void /* struct objc_super *super, SEL op, ... */ )  //将消息发送给父类
     __OSX_AVAILABLE_STARTING(__MAC_10_0, __IPHONE_2_0);
 #else
+
+
+//发送给类的一个实例对象 一个简单返回类型的消息
 /** 
  * Sends a message with a simple return value to an instance of a class.
  * 
- * @param self A pointer to the instance of the class that is to receive the message.
- * @param op The selector of the method that handles the message.
+ * @param self A pointer to the instance of the class that is to receive the message.   //self用来接收消息
+ * @param op The selector of the method that handles the message.           // op 来处理消息
  * @param ... 
- *   A variable argument list containing the arguments to the method.
+ *   A variable argument list containing the arguments to the method.       //含有一个参数列表
  * 
  * @return The return value of the method.
  * 
@@ -228,7 +238,7 @@ OBJC_EXPORT void objc_msgSend_fp2ret(id self, SEL op, ...)
  * These functions must be cast to an appropriate function pointer type 
  * before being called. 
  */
-#if !OBJC_OLD_DISPATCH_PROTOTYPES
+#if !OBJC_OLD_DISPATCH_PROTOTYPES    //不是旧的DISPATCH原型的时候
 OBJC_EXPORT void method_invoke(void /* id receiver, Method m, ... */ ) 
     __OSX_AVAILABLE_STARTING(__MAC_10_5, __IPHONE_2_0);
 OBJC_EXPORT void method_invoke_stret(void /* id receiver, Method m, ... */ ) 
@@ -258,6 +268,8 @@ OBJC_EXPORT void method_invoke_stret(id receiver, Method m, ...)
  * Before Mac OS X 10.6, _objc_msgForward must not be called directly 
  * but may be compared to other IMP values.
  */
+
+//消息转发
 #if !OBJC_OLD_DISPATCH_PROTOTYPES
 OBJC_EXPORT void _objc_msgForward(void /* id receiver, SEL sel, ... */ ) 
     __OSX_AVAILABLE_STARTING(__MAC_10_0, __IPHONE_2_0);
