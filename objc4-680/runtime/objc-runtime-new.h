@@ -62,30 +62,30 @@ struct cache_t {
     mask_t _occupied;           //16位或者32位的一个_occupied
 
 public:
-    struct bucket_t *buckets();         //
-    mask_t mask();
-    mask_t occupied();
-    void incrementOccupied();
-    void setBucketsAndMask(struct bucket_t *newBuckets, mask_t newMask);
-    void initializeToEmpty();
+    struct bucket_t *buckets();         //获取_buckets _buckets的get方法
+    mask_t mask();                      //mask的获取方法
+    mask_t occupied();                  //occupied的获取方法
+    void incrementOccupied();           //操作occupied自增
+    void setBucketsAndMask(struct bucket_t *newBuckets, mask_t newMask);  //同时设置_buckets和_mask
+    void initializeToEmpty();           //初始化cache_t本结构体为空的结构体
 
-    mask_t capacity();
-    bool isConstantEmptyCache();
-    bool canBeFreed();
+    mask_t capacity();                  //返回cache_t的容量，返回值是一个mask_t（unsigned int  32 位 或者 unsigned short 16 位）类型的
+    bool isConstantEmptyCache();        //判断是否是一个常量空的cache 判断被初次创建之后 有没有被使用过
+    bool canBeFreed();                  //判断是否可以被释放掉
 
-    static size_t bytesForCapacity(uint32_t cap);
-    static struct bucket_t * endMarker(struct bucket_t *b, uint32_t cap);
+    static size_t bytesForCapacity(uint32_t cap);                           //返回容量的字节数
+    static struct bucket_t * endMarker(struct bucket_t *b, uint32_t cap);   //获取end marker
 
-    void expand();
-    void reallocate(mask_t oldCapacity, mask_t newCapacity);
-    struct bucket_t * find(cache_key_t key, id receiver);
+    void expand();  //扩充
+    void reallocate(mask_t oldCapacity, mask_t newCapacity);    //再次分配空间 重新申请分配空间
+    struct bucket_t * find(cache_key_t key, id receiver);        //查找
 
-    static void bad_cache(id receiver, SEL sel, Class isa) __attribute__((noreturn));
+    static void bad_cache(id receiver, SEL sel, Class isa) __attribute__((noreturn));  //判断是否是坏的cache 缓存
 };
 
 
 // classref_t is unremapped class_t*
-typedef struct classref * classref_t;
+typedef struct classref * classref_t;       //classref_t 跟 class_t * 是一模一样的同一个 只不过有两个名字
 
 /***********************************************************************
 * entsize_list_tt<Element, List, FlagMask>
@@ -97,36 +97,36 @@ typedef struct classref * classref_t;
 *   (e.g. method list fixup markers)
 **********************************************************************/
 template <typename Element, typename List, uint32_t FlagMask>
-struct entsize_list_tt {
-    uint32_t entsizeAndFlags;
-    uint32_t count;
-    Element first;
+struct entsize_list_tt {            //结构体 entsize_list_tt 的定义
+    uint32_t entsizeAndFlags;            //unsigned int 类型的 entsizeAndFlags 存储了 entsize（每一个元素占用的字节数） 和 Flags
+    uint32_t count;                      //unsigned int 类型的 count
+    Element first;                       // Element 类型的第一个元素
 
-    uint32_t entsize() const {
+    uint32_t entsize() const {             //获取 entsize  每一个元素占用的字节数
         return entsizeAndFlags & ~FlagMask;
     }
-    uint32_t flags() const {
+    uint32_t flags() const {                //获取 flags
         return entsizeAndFlags & FlagMask;
     }
 
-    Element& getOrEnd(uint32_t i) const { 
+    Element& getOrEnd(uint32_t i) const {              //获取某个元素 i <= count
         assert(i <= count);
         return *(Element *)((uint8_t *)&first + i*entsize()); 
     }
-    Element& get(uint32_t i) const { 
+    Element& get(uint32_t i) const {                    //获取某个元素 i < count
         assert(i < count);
         return getOrEnd(i);
     }
 
     size_t byteSize() const {
-        return sizeof(*this) + (count-1)*entsize();
+        return sizeof(*this) + (count-1)*entsize();  //获取占用的字节数 ：this指针指向的变量（含有第一个元素）的占用字节数 + （总数量-1）* 每一个元素占用的字节数
     }
 
-    List *duplicate() const {
-        return (List *)memdup(this, this->byteSize());
+    List *duplicate() const {           //重复：返回一个指向链表指针  重新创建 一个 复制其中内容
+        return (List *)memdup(this, this->byteSize());     //memdup()的定义在objc-os.h中
     }
 
-    struct iterator;
+    struct iterator;                //枚举器的 向前声明
     const iterator begin() const { 
         return iterator(*static_cast<const List*>(this), 0); 
     }
@@ -140,27 +140,36 @@ struct entsize_list_tt {
         return iterator(*static_cast<const List*>(this), count); 
     }
 
-    struct iterator {
-        uint32_t entsize;
-        uint32_t index;  // keeping track of this saves a divide in operator-
-        Element* element;
+    struct iterator {               //枚举器的 定义
+        uint32_t entsize;                   //实体元素element 所占用的内存大小 字节数 返回一个 unsigned int
+        uint32_t index;                     // keeping track of this saves a divide in operator-
+                                            //unsigned int类型的索引  跟踪索引可以在枚举器中有一个分界
+        Element* element;                   //实体元素 element 是以指针类型 指向元素类型的一个指针来存储的
 
-        typedef std::random_access_iterator_tag iterator_category;
-        typedef Element value_type;
-        typedef ptrdiff_t difference_type;
-        typedef Element* pointer;
-        typedef Element& reference;
+        typedef std::random_access_iterator_tag iterator_category;       //定义别名 iterator_category 就是 std
+                                                                         //std是在random_access_iterator_tag有效范围内
+                                                                        //random_access_iterator_tag 就是  public bidirectional_iterator_tag {}
+        typedef Element value_type;                  //定义别名
+        typedef ptrdiff_t difference_type;           //定义别名  索引的差值 delta 的类型
+        typedef Element* pointer;                   //定义别名  pointer 指针 就是指向元素类型的指针
+        typedef Element& reference;                 //定义别名  reference  就是元素类型的引用 引用类型跟元素的变量名是一模一样的
+                                                    //---int &j=i,此时i和j代表同一个对象，改变j就是改变i.
+        
+                            // & :表示引用，就是对象的另一个名字， （传值的时候的引用传值）
+                            //例如 int i = 10; int &j=i,此时i和j代表同一个对象，改变j就是改变i.
+                            //但是不能这样 int &m = 10;，因为引用的要是一个对象。
+                            //但是加上const 时 ，引用可以初始化为不同类型的对象或者初始化为右值，例如 可以写成 const int &n=12;
 
-        iterator() { }
+        iterator() { }      //默认构造函数
 
-        iterator(const List& list, uint32_t start = 0)
-            : entsize(list.entsize())
-            , index(start)
-            , element(&list.getOrEnd(start))
+        iterator(const List& list, uint32_t start = 0)      //带参数的构造函数 List& list 说明list是引用类型，改变list就是改变之前的变量
+            : entsize(list.entsize())                   //初始化实体类型大小size
+            , index(start)                              //初始化index
+            , element(&list.getOrEnd(start))            //初始化 element 指针
         { }
 
-        const iterator& operator += (ptrdiff_t delta) {
-            element = (Element*)((uint8_t *)element + delta*entsize);
+        const iterator& operator += (ptrdiff_t delta) {   //重构 += 操作符返回的是一个 枚举器的引用类型
+            element = (Element*)((uint8_t *)element + delta*entsize);  //说明是按照数组的形式存储的 元素的地址都存在在连续的地址空间，可以直接加间距值去取数据
             index += (int32_t)delta;
             return *this;
         }
@@ -189,8 +198,8 @@ struct entsize_list_tt {
             return (ptrdiff_t)this->index - (ptrdiff_t)rhs.index;
         }
 
-        Element& operator * () const { return *element; }
-        Element* operator -> () const { return element; }
+        Element& operator * () const { return *element; }  //返回的是引用的类型
+        Element* operator -> () const { return element; }   //返回的是指针的类型
 
         operator Element& () const { return *element; }
 
@@ -210,11 +219,11 @@ struct entsize_list_tt {
     };
 };
 
-
+// method_t 结构体的定义 代表 方法的实体
 struct method_t {
-    SEL name;
-    const char *types;
-    IMP imp;
+    SEL name;            //selector 的name
+    const char *types;   // types？？----XH版本解释--方法类型字符串，有的地方又称 method signature 方法签名
+    IMP imp;             //方法的实现指针
 
     struct SortBySELAddress :
         public std::binary_function<const method_t&,
@@ -226,6 +235,7 @@ struct method_t {
     };
 };
 
+//成员变量结构体 ivar_t 定义
 struct ivar_t {
 #if __x86_64__
     // *offset was originally 64-bit on some x86_64 platforms.
@@ -235,25 +245,27 @@ struct ivar_t {
     // Some code uses all 64 bits. class_addIvar() over-allocates the 
     // offset for their benefit.
 #endif
-    int32_t *offset;
-    const char *name;
-    const char *type;
+    int32_t *offset;    //偏移量
+    const char *name;   //成员变量的name
+    const char *type;   //成员变量的类型
     // alignment is sometimes -1; use alignment() instead
-    uint32_t alignment_raw;
-    uint32_t size;
+    uint32_t alignment_raw;     //是否是线性对其的标志
+    uint32_t size;              //size 尺寸大小
 
-    uint32_t alignment() const {
+    uint32_t alignment() const {    //线性对齐的方法
         if (alignment_raw == ~(uint32_t)0) return 1U << WORD_SHIFT;
         return 1 << alignment_raw;
     }
 };
 
+//属性的结构体定义
 struct property_t {
     const char *name;
     const char *attributes;
 };
 
 // Two bits of entsize are used for fixup markers.
+// entsize 字段中有两位被用来 标记修订 markers
 struct method_list_t : entsize_list_tt<method_t, method_list_t, 0x3> {
     bool isFixedUp() const;
     void setFixedUp();
@@ -281,13 +293,14 @@ typedef uintptr_t protocol_ref_t;  // protocol_t *, but unremapped
 
 #define PROTOCOL_FIXED_UP_MASK (PROTOCOL_FIXED_UP_1 | PROTOCOL_FIXED_UP_2)
 
+// 协议 protocol_t 的结构定义 一个协议 一个协议可以有多个协议方法 协议方法也分为类方法和实例方法
 struct protocol_t : objc_object {
-    const char *mangledName;
-    struct protocol_list_t *protocols;
-    method_list_t *instanceMethods;
-    method_list_t *classMethods;
-    method_list_t *optionalInstanceMethods;
-    method_list_t *optionalClassMethods;
+    const char *mangledName;            //重整的名字
+    struct protocol_list_t *protocols;  //指向一个协议列表的指针
+    method_list_t *instanceMethods;     //协议中 实例方法 的指针
+    method_list_t *classMethods;        //协议中 类方法列表 的指针
+    method_list_t *optionalInstanceMethods;         // 可选实例方法列表 的指针
+    method_list_t *optionalClassMethods;            // 可选类方法列表 的指针
     property_list_t *instanceProperties;
     uint32_t size;   // sizeof(protocol_t)
     uint32_t flags;
@@ -313,7 +326,10 @@ struct protocol_t : objc_object {
     }
 };
 
+//协议列表 结构 的定义 是一个列表 里面存的是多个协议 一个类遵守多个协议
 struct protocol_list_t {
+    //协议列表 没有继承自 枚举器 其他的方法列表 成员属性列表都继承自了一个枚举器
+    
     // count is 64-bit by accident. 
     uintptr_t count;
     protocol_ref_t list[0]; // variable-size
@@ -508,7 +524,8 @@ struct locstamped_category_list_t {
 
 #endif
 
-
+//class_ro_t 结构体定义 read only ----用来存储 类 在编译期就已经确定的属性、方法以及遵循的协议
+//后面还有 类的读写结构的定义 class_rw_t
 struct class_ro_t {
     uint32_t flags;
     uint32_t instanceStart;
@@ -535,7 +552,7 @@ struct class_ro_t {
 
 /***********************************************************************
 * list_array_tt<Element, List>
-* Generic implementation for metadata that can be augmented by categories.
+* Generic（普通的） implementation for metadata that can be augmented by categories.
 *
 * Element is the underlying metadata type (e.g. method_t)
 * List is the metadata's list type (e.g. method_list_t)
@@ -545,10 +562,20 @@ struct class_ro_t {
 * - a pointer to a single list
 * - an array of pointers to lists
 *
+ Element 是元数据类型，比如 method_t
+ List 是元数据的列表类型，比如 method_list_t
+ 
+ 一个 list_array_tt 的值可能有三种情况：
+ - 空的
+ - 一个指针指向一个单独的列表
+ - 一个数组，数组中都是指针，每个指针分别指向一个列表
+ 
 * countLists/beginLists/endLists iterate the metadata lists
 * count/begin/end iterate the underlying metadata elements
 **********************************************************************/
 template <typename Element, typename List>
+
+// list_array_tt 类的自定义 最基本 抽象的类  下面的
 class list_array_tt {
     struct array_t {
         uint32_t count;
@@ -605,7 +632,7 @@ class list_array_tt {
             }
             return *this;
         }
-    };
+    };          //iterator类 结束
 
  private:
     union {
@@ -737,9 +764,10 @@ class list_array_tt {
 
         return result;
     }
-};
+};          // list_array_tt 类定义结束
 
-
+//方法集合类的定义
+// method_array_t 类的定义 继承自 list_array_tt
 class method_array_t : 
     public list_array_tt<method_t, method_list_t> 
 {
@@ -757,7 +785,7 @@ class method_array_t :
     }
 };
 
-
+//属性集合类 property_array_t 继承自 list_array_tt  类
 class property_array_t : 
     public list_array_tt<property_t, property_list_t> 
 {
@@ -769,7 +797,7 @@ class property_array_t :
     }
 };
 
-
+//协议集合类的定义
 class protocol_array_t : 
     public list_array_tt<protocol_ref_t, protocol_list_t> 
 {
@@ -781,12 +809,13 @@ class protocol_array_t :
     }
 };
 
-
+//类的读写结构的定义 class_rw_t 之前有 class_ro_t
+//class_ro_t 结构体定义 read only ----用来存储 类 在编译期就已经确定的属性、方法以及遵循的协议
 struct class_rw_t {
     uint32_t flags;
     uint32_t version;
 
-    const class_ro_t *ro;
+    const class_ro_t *ro;  // 类的读写结构中有 类的ro（read only）结构的数据 ro的数据是在编译器就已经确定的 包括是不是元类 以及相应的在编译器就已经确定的属性方法协议
 
     method_array_t methods;
     property_array_t properties;
@@ -820,11 +849,16 @@ struct class_rw_t {
     }
 };
 
-
+// class_data_bits_t 结构体的定义 里面存储了类的一些信息 ro 或者是 rw的一些信息
 struct class_data_bits_t {
 
     // Values are the FAST_ flags above.
     uintptr_t bits;
+    
+    // 只有这个一个成员变量，所有数据都存在这里，包括 rw 的地址和一些 flag
+    // 1. 在 realized 之前，bits 存的是 ro 的地址，
+    // 2. realized 后，bits 存 rw 的地址，rw 里的存有 ro 的地址
+    
 private:
     bool getBit(uintptr_t bit)
     {
@@ -1014,16 +1048,22 @@ public:
         setBits(FAST_IS_SWIFT);
     }
 };
+//class_data_bits_t 结构体的定义结束了 里面存储了类的一些信息 ro 或者是 rw的一些信息 及其操作方法
 
+// objc_class 结构体的定义
 
+//typedef struct objc_class *Class;
+
+//struct objc_class : objc_object {//objc-runtime-old中也有这个的定义
 struct objc_class : objc_object {
     // Class ISA;
     Class superclass;
     cache_t cache;             // formerly cache pointer and vtable
+                                //缓存槽 之前定义的结构体 bucket_t 槽
     class_data_bits_t bits;    // class_rw_t * plus custom rr/alloc flags
-
-    class_rw_t *data() { 
-        return bits.data();
+                                //上面定义的一个结构体 里面存储的是 类的一些信息 ro 或者是 rw的一些信息 及其操作方法
+    class_rw_t *data() {
+        return bits.data();  //class_rw_t* data() {
     }
     void setData(class_rw_t *newData) {
         bits.setData(newData);
@@ -1193,7 +1233,7 @@ struct objc_class : objc_object {
         return ISA() == (Class)this;
     }
 
-    const char *mangledName() { 
+    const char *mangledName() {   //返回重整的名字
         // fixme can't assert locks here
         assert(this);
 
@@ -1234,8 +1274,9 @@ struct objc_class : objc_object {
         bits.setFastInstanceSize(newSize);
     }
 };
+//objc_class 结构体定义结束
 
-
+//swift_class_t 结构体定义开始 ---Swift的类
 struct swift_class_t : objc_class {
     uint32_t flags;
     uint32_t instanceAddressOffset;
@@ -1253,7 +1294,7 @@ struct swift_class_t : objc_class {
     }
 };
 
-
+//分类的结构体的定义开始  没有继承自 objc_class
 struct category_t {
     const char *name;
     classref_t cls;
@@ -1272,6 +1313,7 @@ struct category_t {
         else return instanceProperties;
     }
 };
+//分类的结构体的定义结束
 
 struct objc_super2 {
     id receiver;
@@ -1286,6 +1328,7 @@ struct message_ref_t {
 
 extern Method protocol_getMethod(protocol_t *p, SEL sel, bool isRequiredMethod, bool isInstanceMethod, bool recursive);
 
+// 深度遍历 top 类及其子孙类
 static inline void
 foreach_realized_class_and_subclass_2(Class top, bool (^code)(Class)) 
 {
