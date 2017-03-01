@@ -959,7 +959,7 @@ static T exp2m1u(T x) {
 // This ALSO REQUIRES each of these be in libobjc's unexported symbol list.
 #if __cplusplus
 #pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Winline-new-delete"
+#pragma clang diagnostic ignored "-Winline-new-delete" //clang编译器忽略了 ”-Winline-new-delete“ 这一类的警告
 #include <new>
 inline void* operator new(std::size_t size) throw (std::bad_alloc) { return malloc(size); }
 inline void* operator new[](std::size_t size) throw (std::bad_alloc) { return malloc(size); }
@@ -1002,6 +1002,7 @@ class TimeLogger {
 // 就像这样 | 64bits | 64bits | 64bits | 64bits | 64bits | 64bits | 64bits | 64bits | ....
 // 一共有 64 块，每块的大小是 64 的整数倍
 template<typename T>
+// StripedMap 的定义 好像是对存放做了优化，整数倍对其的存放
 class StripedMap {
 
     enum { CacheLineSize = 64 };

@@ -93,7 +93,7 @@ struct weak_entry_t {
  * and weak_entry_t structs as their values.
  */
 // 全局的弱引用表
-struct weak_table_t {
+struct weak_table_t {      //Sidetable中就存了一个弱引用表，就是weak_table_t类型的表
     weak_entry_t *weak_entries; // 一个数组，数组每个元素是 weak_entry_t 结构体，里面存了弱引用对象，以及指向它的弱引用们
     size_t    num_entries; // 实体的数量
     uintptr_t mask;

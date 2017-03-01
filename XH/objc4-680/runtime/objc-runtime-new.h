@@ -1619,7 +1619,7 @@ public:
 // 元类的 isa 指向根元类，根元类的 isa 指向自己
 
 // 当创建一个 Objective-C对象时，runtime会在实例变量存储区域后面再分配一点额外的空间。这么做的目的是什么呢？你可以获取这块空间起始指针（用 object_getIndexedIvars），然后就可以索引实例变量（ivars）
-
+//class 派生类名 : 继承方式 基类名
 struct objc_class : objc_object {
 //    Class ISA;    // 别疑惑，确实是被apple注释了。
                     // 原来是用来存储元类信息的，但是现在不是了，因为 objc_class 继承自 objc_object

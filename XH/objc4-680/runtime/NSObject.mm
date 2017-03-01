@@ -41,6 +41,21 @@
 #include <map>
 #include <execinfo.h>
 
+//比较重要的数据结构：
+/*
+ *比较重要的数据结构：
+ *  struct SideTable
+ *  StripedMap<SideTable> 将其Stripe化 分成 64 一块 64一块
+ *  静态数组 SideTableBuf
+ *  objc_retain       持有block等
+ *  objc_storeStrong  strong存储
+ *  storeWeak         weak的存储
+ *  objc_initWeak
+ *  objc_destoryWeak
+ *
+    AutoreleasePoolPage
+ */
+
 /*
  #ALLEN:
  An NSInvocation is an Objective-C message rendered static, that is, it is an action turned into an object. NSInvocation objects are used to store and forward messages between objects and between applications, primarily by NSTimer objects and the distributed objects system.
@@ -127,7 +142,7 @@ void _objc_setBadAllocHandler(id(*newHandler)(Class))
 }
 
 
-namespace {
+namespace { //匿名命名空间
 
 // The order of these bits is important.
     
@@ -154,7 +169,7 @@ typedef objc::DenseMap<DisguisedPtr<objc_object>,size_t,true> RefcountMap;
 struct SideTable {
     spinlock_t slock; // 自旋锁（忙等锁）
     RefcountMap refcnts; // 用来记录引用计数、是否有弱引用、是否在 dealloc 等信息
-    weak_table_t weak_table;  // 弱引用表，存了弱引用对象，以及指向它的弱引用们
+    weak_table_t weak_table;  // 弱引用表，存了弱引用对象，以及指向它的弱引用们  weak_table_t
 
     SideTable() {  //构造函数
         // 将 weak_table 所在区域的内存清零
@@ -258,7 +273,7 @@ static StripedMap<SideTable>& SideTables() {
     return *reinterpret_cast<StripedMap<SideTable>*>(SideTableBuf);
 }
 
-// anonymous namespace
+// anonymous namespace 匿名命名空间
 };
 
 
@@ -527,7 +542,7 @@ objc_initWeakOrNil(id *location, id newObj)
  *
  * This function IS NOT thread-safe with respect to（关于） concurrent
  * modifications to the weak variable. (Concurrent weak clear is safe.)
- * 
+ * 当并发修改弱变量的时候这个方法不是线程安全的
  * @param location The weak pointer address. 
  */
 // 清除 location 的弱引用，即 location 不指向任何对象，*location 变成 nil
@@ -545,7 +560,7 @@ objc_loadWeakRetained(id *location)
     id result;
 
     SideTable *table;
-    
+                   //SideTable 很重要的一个数据结构
  retry:
     result = *location;
     if (!result) return nil;
@@ -813,6 +828,7 @@ class AutoreleasePoolPage
         protect();
     }
 
+    //析构函数
     ~AutoreleasePoolPage() 
     {
         check();
@@ -954,7 +970,7 @@ class AutoreleasePoolPage
     void kill() 
     {
         // Not recursive: we don't want to blow out the stack 
-        // if a thread accumulates a stupendous amount of garbage
+        // if a thread accumulates a stupendous（惊人的） amount of garbage
         
         // 找到链表中最后一个AutoreleasePoolPage
         AutoreleasePoolPage *page = this;
@@ -1350,7 +1366,7 @@ public: // 前面都是私有成员和方法，下面开始是公开的方法
 #undef POOL_SENTINEL
 };
 
-// anonymous namespace
+// anonymous namespace 匿名命名空间
 };
 
 
@@ -1401,7 +1417,7 @@ objc_object::clearDeallocating_slow()
         
         // 将 weak table 中该对象的所有记录都删除，
         // 并且会做将__weak pointer置为 nil 的重要操作
-        weak_clear_no_lock(&table.weak_table, (id)this);
+        weak_clear_no_lock(&table.weak_table, (id)this);//清空 side table 中该对象对应的弱引用表 这个方法实现的 每一个都要用到这个方法
     }
     // 将该对象的引用计数清空
     if (isa.has_sidetable_rc) {
@@ -1444,6 +1460,7 @@ objc_object::overrelease_error()
 
 #if DEBUG
 // Used to assert that an object is not present in the side table.
+//用来断言 一个对象 不存在在 side table 中
 bool
 objc_object::sidetable_present()
 {
@@ -1486,6 +1503,7 @@ objc_object::sidetable_unlock()
 // as well as isDeallocating and weaklyReferenced.
 // 向 side table 中加上指定的引用计数（从 isa 中的全部引用计数移到 side table，但这个函数中只做side table中引用计数增加的步骤，不做 isa 中的引用计数减少的步骤）
 // 和 sidetable_addExtraRC_nolock 不一样，不要混淆
+// isa 中的全部引用计数移到 side table
 void 
 objc_object::sidetable_moveExtraRC_nolock(size_t extra_rc, // 引用计数
                                           bool isDeallocating, // 是否在 dealloc
@@ -1531,6 +1549,7 @@ objc_object::sidetable_moveExtraRC_nolock(size_t extra_rc, // 引用计数
 // Returns true if the object is now pinned.
 // 向 side table 中加上指定的引用计数（从 isa 中的部分引用计数移到 side table，但这个函数中只做side table中引用计数增加的步骤，不做 isa 中的引用计数减少的步骤），不要与 sidetable_moveExtraRC_nolock 混淆
 // 返回值表示引用计数是否已经存满了
+//isa 中的部分引用计数移到 side table
 bool 
 objc_object::sidetable_addExtraRC_nolock(size_t delta_rc)
 {
@@ -2178,7 +2197,7 @@ _objc_rootHash(id obj)
 }
 
 
-//    经过实验，原代码：
+//    经过实验，原代码：---实验代码是如何转换生成出来的？
 //    int main(int argc, const char * argv[]) {
 //    @autoreleasepool {
 //        int a = 0;
@@ -2359,7 +2378,7 @@ void arr_init(void)
     if (UseGC) gc_init2();
 }
 
-+ (void)initialize {
++ (void)initialize {//怎么什么都没有做呢？做了啥 在哪做的？
 }
 
 + (id)self {
@@ -2378,6 +2397,15 @@ void arr_init(void)
     return object_getClass(self);
 }
 
+/*
+ //class 派生类名 : 继承方式 基类名
+ struct objc_class : objc_object{
+ 中有一句
+ Class superclass; // 指向当前类的父类
+ self是objc_class类型的
+ 
+ class和struct有什么区别？
+ */
 + (Class)superclass {
     return self->superclass;
 }
@@ -2386,6 +2414,7 @@ void arr_init(void)
     return [self class]->superclass;
 }
 
+//isMemberOfClass和isKindOfClass的区别 isKindOfClass 包括了判断是否是其子类
 + (BOOL)isMemberOfClass:(Class)cls {
     return object_getClass((id)self) == cls;
 }
@@ -2478,7 +2507,7 @@ void arr_init(void)
     return NO;
 }
 
-+ (BOOL)isProxy {
++ (BOOL)isProxy {//Proxy：代理
     return NO;
 }
 
@@ -2513,10 +2542,11 @@ void arr_init(void)
 // 返回值表示这个类是否能新增一个实例方法用以处理此 SEL
 // 在继续往下执行转发机制之前，本类有机会新增一个处理此 SEL 的方法
 // 在 _class_resolveInstanceMethod 中被调用
+//比较重要的一个方法，可以做很多事情
 + (BOOL)resolveInstanceMethod:(SEL)sel {
     return NO;
 }
-
+//抛出异常打印的信息 常见的信息来源
 // Replaced by CF (throws an NSException)
 + (void)doesNotRecognizeSelector:(SEL)sel {
     _objc_fatal("+[%s %s]: unrecognized selector sent to instance %p", 
@@ -2532,7 +2562,7 @@ void arr_init(void)
 
 + (id)performSelector:(SEL)sel {
     if (!sel) [self doesNotRecognizeSelector:sel];
-    return ((id(*)(id, SEL))objc_msgSend)((id)self, sel);
+    return ((id(*)(id, SEL))objc_msgSend)((id)self, sel);//调用对应的方法 发送消息
 }
 
 + (id)performSelector:(SEL)sel withObject:(id)obj {
@@ -2547,7 +2577,7 @@ void arr_init(void)
 
 - (id)performSelector:(SEL)sel {
     if (!sel) {[self doesNotRecognizeSelector:sel];}
-    // 原来本质都是用了 objc_msgSend
+    // 原来本质都是发送消息 用了 objc_msgSend
     return ((id(*)(id, SEL))objc_msgSend)(self, sel);
 }
 
@@ -2580,6 +2610,7 @@ void arr_init(void)
                 "not available without CoreFoundation");
 }
 
+//消息转发
 + (void)forwardInvocation:(NSInvocation *)invocation {
     [self doesNotRecognizeSelector:(invocation ? [invocation selector] : 0)];
 }
@@ -2702,7 +2733,7 @@ void arr_init(void)
     return ULONG_MAX;
 }
 
-// 取得引用计数总数，看来传言的引用计数不准的说法是错误的
+// 取得引用计数总数，看来传言的引用计数不准的说法是错误的？？
 - (NSUInteger)retainCount {
     return ((id)self)->rootRetainCount();
 }
