@@ -36,25 +36,34 @@ static const objc_selopt_t *builtins = NULL;
 
 
 static size_t SelrefCount = 0;
+        //NXMapTable 是在maptable.h中定义的
+        /*
+         typedef struct _NXMapTable {
+        const struct _NXMapTablePrototype	*prototype;
+        unsigned	count;
+        unsigned	nbBucketsMinusOne;
+        void	*buckets;
+        } NXMapTable OBJC_MAP_AVAILABILITY;
+         */
+static NXMapTable *namedSelectors;  //用来存啥？？？？
 
-static NXMapTable *namedSelectors;
-
-static SEL search_builtins(const char *key);
+static SEL search_builtins(const char *key);  //这个方法干啥的？返回了一个SEL类型的值 向前声明的方法 使用在后面 实现在后后面
 
 
 /***********************************************************************
 * sel_init
 * Initialize selector tables and register selectors used internally.
+  Initialize方法表 和 注册方法的时候 内部使用这个方法
 **********************************************************************/
 void sel_init(bool wantsGC, size_t selrefCount)
 {
     // save this value for later
-    SelrefCount = selrefCount;
+    SelrefCount = selrefCount; //自身引用的count计数
 
 #if SUPPORT_PREOPT
-    builtins = preoptimizedSelectors();
+    builtins = preoptimizedSelectors();//这个方法定义在objc-opt.mm文件中  返回预先优化过的方法们？？？？？？
 
-    if (PrintPreopt  &&  builtins) {
+    if (PrintPreopt  &&  builtins) {  //builtins 是在objc-share-cache中定义的 objc_stringhash_t struct
         uint32_t occupied = builtins->occupied;
         uint32_t capacity = builtins->capacity;
         
@@ -74,11 +83,12 @@ void sel_init(bool wantsGC, size_t selrefCount)
         // helps enforce the initialization order.
     }
 
+    //sel_registerNameNoLock()这个方法在后面实现了注册方法的名字 不加锁 调用这里 外面加了锁
 #define s(x) SEL_##x = sel_registerNameNoLock(#x, NO)
 #define t(x,y) SEL_##y = sel_registerNameNoLock(#x, NO)
 
     sel_lock();
-
+   //注册方法名字？？ 以后就可以识别这些方法了？？？？
     s(load);
     s(initialize);
     t(resolveInstanceMethod:, resolveInstanceMethod);
@@ -108,17 +118,18 @@ void sel_init(bool wantsGC, size_t selrefCount)
 }
 
 
-// 创建一个 selector，如果设置需要 copy，就在堆中分配内存
+// 创建一个 selector，如果设置需要 copy，就在堆中分配内存-----参数copy传yes，就会是在堆中分配内存 存这个 name 然后返回 否则是在哪里？？栈？？应该不是栈  全局区域？ 代码区域 不是 常量区 应该是常量区 说了 const嘛
 // 因为 selector 本质上就是 char * 字符串，所以直接强转就可以了
 static SEL sel_alloc(const char *name, bool copy)
 {
     selLock.assertWriting();
-    return (SEL)(copy ? strdup(name) : name);    
+    return (SEL)(copy ? strdup(name) : name);
+    //strdup() ----- char	*strdup(const char *__s1);
 }
 
 // 取得 sel 中的方法名，其实 sel 就是一个 char * 字符串
 // 强转为 char * ，就得到了方法名
-const char *sel_getName(SEL sel) 
+const char *sel_getName(SEL sel) //验证的demo是用的这个方法吗？ 也可以这样获取到name 见demo test
 {
     // 不能为空
     if (!sel) {
@@ -128,16 +139,16 @@ const char *sel_getName(SEL sel)
     return (const char *)(const void*)sel;
 }
 
-
+//干啥的？？？判断是否进行了 映射？？？
 BOOL sel_isMapped(SEL sel) 
 {
-    if (!sel) return NO;
+    if (!sel) return NO; //nil 的时候 还说啥
 
-    const char *name = (const char *)(void *)sel;
+    const char *name = (const char *)(void *)sel; //这个强转是几个意思？？？？
 
-    if (sel == search_builtins(name)) return YES;
+    if (sel == search_builtins(name)) return YES;   //在XX里面能够找到，说明是已经映射过了
 
-    rwlock_reader_t lock(selLock);
+    rwlock_reader_t lock(selLock);  //没有映射的话 ，就需要上 readwrite的锁
     if (namedSelectors) {
         return (sel == (SEL)NXMapGet(namedSelectors, name));
     }
@@ -148,7 +159,7 @@ BOOL sel_isMapped(SEL sel)
 static SEL search_builtins(const char *name) 
 {
 #if SUPPORT_PREOPT
-    if (builtins) return (SEL)builtins->get(name);
+    if (builtins) return (SEL)builtins->get(name); //name作为key去按照偏移量的方式去索引一个值 具体的是啥 只能以后慢慢看了
 #endif
     return nil;
 }

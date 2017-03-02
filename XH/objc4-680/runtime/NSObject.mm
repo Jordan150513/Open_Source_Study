@@ -58,7 +58,7 @@
 
 /*
  #ALLEN:
- An NSInvocation is an Objective-C message rendered static, that is, it is an action turned into an object. NSInvocation objects are used to store and forward messages between objects and between applications, primarily by NSTimer objects and the distributed objects system.
+ An NSInvocation is an Objective-C message rendered（是成为） static, that is, it is an action turned into an object. NSInvocation objects are used to store and forward messages between objects and between applications, primarily by NSTimer objects and the distributed objects system.
  */
 // 这个声明好像不是 NSInvocation 真正的形态
 // 在 NSInvocation.h 有复杂得多的声明
@@ -273,7 +273,7 @@ static StripedMap<SideTable>& SideTables() {
     return *reinterpret_cast<StripedMap<SideTable>*>(SideTableBuf);
 }
 
-// anonymous namespace 匿名命名空间
+// anonymous namespace 匿名命名空间结束
 };
 
 

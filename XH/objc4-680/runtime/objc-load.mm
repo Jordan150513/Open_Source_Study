@@ -27,7 +27,11 @@
  *	Author:	s. naroff
  *
  */
-
+/*
+ * 带着疑问 load 方法里面做了什么 跟initlialer方法有什么区别？
+ * load()里就进行了加载各种module 以及 unload module
+ *
+ */
 #include "objc-private.h"
 #include "objc-load.h"
 
@@ -52,6 +56,8 @@ extern void (*callbackFunction)( Class, Category );
 * deadlock which was hard to remove.  The only way you can get into trouble
 * is if one thread loads a module while another thread tries to access the
 * loaded classes (using objc_lookUpClass) before the load is complete.
+ load 并不是真的线程安全的，如果一个load消息递归的调用objc_loadModules()两次，那么这种情况没有问题，可以正常load，但是如果原来的调用者（调用了objc_loadModules（）的那个调用者 类）调用了objc_unloadModules（）
+ 将有可能取消了一个错误的modules 类模块 objc_unloadModules（） 会取消当前正在loading的模块 可能会引起崩溃
 **********************************************************************************/
 int objc_loadModule(char *moduleName, void (*class_callback) (Class, Category), int *errorCode)
 {

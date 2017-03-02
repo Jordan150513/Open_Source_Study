@@ -30,10 +30,10 @@
 #include <sys/types.h>
 #include <libkern/OSAtomic.h>
 
-// 计算 entry 中有多少个 referrer
+// 计算 entry（记录） 中有多少个 referrer
 #define TABLE_SIZE(entry) (entry->mask ? entry->mask + 1 : 0)
 
-// 向 entry 中添加 referrer
+// 向 entry（记录） 中添加 referrer
 static void append_referrer(weak_entry_t *entry, objc_object **new_referrer);
 
 BREAKPOINT_FUNCTION(
@@ -41,9 +41,9 @@ BREAKPOINT_FUNCTION(
 );
 
 /** 
- * Unique hash function for object pointers only.
+ * Unique hash function for object pointers only. 对象指针唯一的哈希方法
  * 
- * @param key The object pointer
+ * @param key The object pointer 对象指针
  * 
  * @return Size unrestricted hash of pointer.
  */
@@ -70,6 +70,8 @@ static inline uintptr_t w_hash_pointer(objc_object **key) {
  * @param entry Weak pointer hash set for a particular object.
  */
 // 给 entry 扩容，然后插入 new_referrer
+
+//entry 是 struct weak_entry_t类型的（类型定义在objc-weak.h） 里面有指向的对象实体 DisguisedPtr<objc_object> referent; // 被指向的对象
 __attribute__((noinline, used))
 static void grow_refs_and_insert(weak_entry_t *entry, 
                                  objc_object **new_referrer)
@@ -81,7 +83,7 @@ static void grow_refs_and_insert(weak_entry_t *entry,
     size_t new_size = old_size ? old_size * 2 : 8;
 
     size_t num_refs = entry->num_refs;
-    weak_referrer_t *old_refs = entry->referrers;
+    weak_referrer_t *old_refs = entry->referrers;  //entry中指向的实体引用对象
     entry->mask = new_size - 1;
     
     // 在堆上分配一片新的内存用于存放 referrers
@@ -107,9 +109,9 @@ static void grow_refs_and_insert(weak_entry_t *entry,
 }
 
 /** 
- * Add the given referrer to set of weak pointers in this entry.
+ * Add the given referrer to set of weak pointers in this entry.  添加引用来设置实体的弱引用指针
  * Does not perform duplicate checking (b/c weak pointers are never
- * added to a set twice). 
+ * added to a set twice).  不要重复添加操作
  *
  * @param entry The entry holding the set of weak pointers. 
  * @param new_referrer The new weak pointer to be added.
@@ -117,11 +119,11 @@ static void grow_refs_and_insert(weak_entry_t *entry,
 static void append_referrer(weak_entry_t *entry, objc_object **new_referrer)
 {
     // out_of_line == 0 的情况
-    if (! entry->out_of_line) {
+    if (! entry->out_of_line) { //就是1bit的标志 如果out_of_line == 0，结构体里就只存一个数组 非0  就标示用额外控件存储的
         // Try to insert inline.
         // inline_referrers 还放得下，就放在 inline_referrers 里
         for (size_t i = 0; i < WEAK_INLINE_COUNT; i++) {
-            if (entry->inline_referrers[i] == nil) {
+            if (entry->inline_referrers[i] == nil) {  //out_of_line == 0，结构体里就只存一个数组 inline_referrers[]
                 entry->inline_referrers[i] = new_referrer;
                 return;
             }
@@ -182,6 +184,7 @@ static void append_referrer(weak_entry_t *entry, objc_object **new_referrer)
  * @param old_referrer The referrer to remove. 
  */
 // 将 old_referrer 从 entry 中移除
+// weak_entry_t类型 就是 weak_table_t 中存的实体，存了指向一个对象的弱引用的哈希集合
 static void remove_referrer(weak_entry_t *entry, objc_object **old_referrer)
 {
     // out_of_line == 0 的情况
@@ -342,7 +345,7 @@ static void weak_entry_remove(weak_table_t *weak_table, weak_entry_t *entry)
 {
     // remove entry
     // 如果 out_of_line == 1，还得手动 free 内存
-    if (entry->out_of_line) {
+    if (entry->out_of_line) {//out_of_line == 1 说明是额外的表存储引用的
         free(entry->referrers);
     }
     // 我猜是将 entry 所在部分的内存清空

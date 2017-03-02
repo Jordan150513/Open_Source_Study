@@ -72,7 +72,7 @@ struct weak_entry_t {
     union {
         struct {
             weak_referrer_t *referrers; // 一个数组，里面存的是指向 referent 的对象们的地址（二级指针），referrers是这个数组的首地址，用 calloc 在堆上分配的，所以需要需要手动 free
-            uintptr_t        out_of_line : 1; // 变量名是 out_of_line ，占 1 个 bit
+            uintptr_t        out_of_line : 1; // 变量名是 out_of_line ，占 1 个 bit 如果out_of_line == 0，结构体里就只存一个数组
             uintptr_t        num_refs : PTR_MINUS_1; // 数组中有几个元素，即 referent 有几个弱引用
             uintptr_t        mask;
             uintptr_t        max_hash_displacement;

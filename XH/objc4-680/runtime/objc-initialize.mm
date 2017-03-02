@@ -70,6 +70,7 @@
  在发送消息之前，这个函数中将会检查 CLS_INITIALIZED 标志位，如果CLS_INITIALIZED 标志位是 0，CLS_INITIALIZING 标志位是 1，
  线程必须阻塞，除非这个线程就是首先初始化这个类的线程
  
+ + load方法呢？和+ initialize 方法的对比 load方法具体做了什么----------qdd-------
  每个线程维护一个正在初始化的类的列表。
  全局的 classInitLock 锁用来同步对 CLS_INITIALIZED 和 CLS_INITIALIZING 的修改，
  对 CLS_INITIALIZING 和 CLS_INITIALIZED 的修改必须是原子的。
@@ -127,7 +128,7 @@
  
     就很悲催地死锁了！
  
-    解决方案：完全初始化父类以后，才能开始初始化子类。（这句话有错误，应该是父类必须比子类先开始初始化，即父类比子类先进入 initializing 状态）
+    解决方案：完全初始化父类以后，才能开始初始化子类。（这句话有错误，应该是---父类必须比子类先开始初始化，即父类比子类先进入 initializing 状态）
             那么类之间的初始化关系就是从根类开始的一个邻接的子树，
             其他线程不能插入两个正在初始化的类之间，也不会出现父类和子类相互等待的情况
  
@@ -177,6 +178,7 @@
 // classInitLock 保护 CLS_INITIALIZED 和 CLS_INITIALIZING
 // 并且会在所有的类都完成 initializing 后被 signal
 // 线程们等待一个类完成 initializing，就是在 wait 这个锁(条件变量)
+//这个锁类是用来 对类的初始化标记initializing的操作 加锁 保证 可以正常且不会引起死锁 ---- 这不是就是一个代码中的例子么 让自己举个栗子 都举不出来
 static monitor_t classInitLock;
 
 
@@ -193,7 +195,7 @@ static monitor_t classInitLock;
 // 这个列表是一个简单的 元类的 数组（元类中存有 initialization 的状态）
 typedef struct _objc_initializing_classes {
     int classesAllocated; // metaclasses 数组的容量，并不是元素的个数
-    Class *metaclasses;   // 存有元类的数组
+    Class *metaclasses;   // 存有元类的数组 ----- 元类 出现了------ 理解元类的概念 -------
 } _objc_initializing_classes;
 
 
@@ -328,6 +330,7 @@ static void _setThisThreadIsInitializingClass(Class cls)
     // paranoia: explicitly disallow duplicates  明确不允许复制
     // 遍历线程正在初始化的元类列表 list->metaclasses，
     // 如果 cls 的元类（ 因为前面有 getMeta ），与列表中的某个元类相同，就报错
+    // 不允许重复对 一个类  进行设置正在初始化的操作
     for (i = 0; i < list->classesAllocated; i++) {
         if (cls == list->metaclasses[i]) {
             _objc_fatal("thread is already initializing this class!");
@@ -438,7 +441,7 @@ static void _finishInitializing(Class cls, Class supercls)
                      cls->nameForLogging());
     }
 
-    // propagate finalization affinity.
+    // propagate（繁殖 增殖） finalization affinity（密切相关的）.
     // 如果用的是GC && 有父类 && 父类需要在主线程结束
     if (UseGC && supercls && supercls->shouldFinalizeOnMainThread()) {
         // 那么 cls 类也必须和父类一致，在主线程结束
@@ -446,7 +449,7 @@ static void _finishInitializing(Class cls, Class supercls)
     }
 
     // mark this class as fully +initialized
-    // 将 cls 设置为已经被 Initialized，里面会做设置是否有自定义 AWZ/RR 的工作，并将 cls 的状态由 Initializing 变为 Initialized
+    // 将 cls 设置为已经被 Initialized，里面会做设置是否有自定义 AWZ/RR （allocWithZone Retain Release）的工作，并将 cls 的状态由 Initializing 变为 Initialized
     cls->setInitialized();
     
     // signal classInitLock 锁，重启动等待 classInitLock 的所有线程
@@ -617,7 +620,7 @@ void _class_initialize(Class cls)
     
     // 以下的每一个分支都是递归的返回点
     
-    // 如果确实需要 Initialize
+    // 如果确实需要 Initialize 类没有正在初始化 也没有初始化完了
     if (reallyInitialize) {
         // We successfully set the CLS_INITIALIZING bit. Initialize the class.
         // 我们成功设置了 CLS_INITIALIZING 位，也就是将 cls 置为 isInitializing 状态
@@ -676,7 +679,7 @@ void _class_initialize(Class cls)
         }
         
         return;
-    }
+    } // 确实需要 Initialize if 结束
     
     else if (cls->isInitializing()) { // 如果 cls 类正在初始化中
         // We couldn't set INITIALIZING because INITIALIZING was already set.

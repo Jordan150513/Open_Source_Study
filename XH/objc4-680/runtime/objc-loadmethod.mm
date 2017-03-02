@@ -21,6 +21,11 @@
  * @APPLE_LICENSE_HEADER_END@
  */
 
+/*
+ *  带着疑问 loadmethod 方法里主要做了什么
+ *
+ *
+ */
 /***********************************************************************
 * objc-loadmethod.m
 * Support for +load methods.
@@ -31,7 +36,7 @@
 
 typedef void(*load_method_t)(id, SEL); // 用于 +load 方法的 imp 类型
 
-struct loadable_class { // 需要被调用 +load 方法的类
+struct loadable_class { // 需要被调用 +load 方法的类 列表里面存的是这个结构体单元 以结构体作为一个单元 存 需要load的类
     Class cls;  // may be nil
     IMP method; // +load 方法对应的 imp
 };
@@ -41,13 +46,14 @@ struct loadable_category { // 需要被调用 +load 方法的分类
     IMP method; // +load 方法对应的 imp
 };
 
-
-// List of classes that need +load called (pending superclass +load)
+//子类
+// List of classes that need +load called (pending superclass +load) 父类调用了load方法之后，这些类调用load方法
 // This list always has superclasses first because of the way it is constructed
-static struct loadable_class *loadable_classes = nil; // 这个列表中存放所有需要调用 +load 方法的类
-static int loadable_classes_used = 0; // loadable_classes 列表中已经被使用了多少个位置
-static int loadable_classes_allocated = 0; // loadable_classes 列表开辟了多少位置，如果位置不够用了，会进行扩容
+static struct loadable_class *loadable_classes = nil; // 这个静态的列表中存放所有需要调用 +load 方法的类
+static int loadable_classes_used = 0; // loadable_classes 静态的列表中已经被使用了多少个位置
+static int loadable_classes_allocated = 0; // loadable_classes 静态的列表开辟了多少位置，如果位置不够用了，会进行扩容
 
+//分类
 // List of categories that need +load called (pending parent class +load)
 static struct loadable_category *loadable_categories = nil; // 这个列表中存放所有需要执行 +load 方法的分类
 static int loadable_categories_used = 0; // loadable_categories 列表中已经被使用了多少个位置
@@ -71,6 +77,7 @@ void add_class_to_loadable_list(Class cls)
     method = cls->getLoadMethod(); // 取得 cls 类的 +load 方法的 imp
     
     if (!method) return;  // Don't bother if cls has no +load method
+                         //如果子类本身就没有load方法，那么就不需要把这个类加入到可load的列表中了 这也就是类的load 方法 没有继承性 就是子类没有load方法 那么不会去执行父类的load 方法
                         // 如果 cls 类压根儿就没有 +load 方法，那也没有将其添加到 loadable_classes 列表的必要
                         // 直接返回
     
@@ -79,7 +86,7 @@ void add_class_to_loadable_list(Class cls)
                      cls->nameForLogging());
     }
     
-    // 如果 loadable_classes 列表已经满了
+    // 如果 loadable_classes 列表已经满了 已经分配 和 已经使用 相等了
     if (loadable_classes_used == loadable_classes_allocated) {
         // 重新计算一下新的大小
         loadable_classes_allocated = loadable_classes_allocated*2 + 16;
@@ -92,7 +99,7 @@ void add_class_to_loadable_list(Class cls)
     
     // cls 插入到列表末尾
     loadable_classes[loadable_classes_used].cls = cls;
-    loadable_classes[loadable_classes_used].method = method;
+    loadable_classes[loadable_classes_used].method = method; //列表里面存的是结构体 结构体里面存的是 cls 和 method
     
     loadable_classes_used++; // 元素数量 +1
 }
@@ -207,10 +214,10 @@ static void call_class_loads(void)
 {
     int i;
     
-    // Detach current loadable list.
+    // Detach current loadable list.获取当前的load列表
     struct loadable_class *classes = loadable_classes; // 先将列表暂存起来，即另一个指针指向列表的内存
     int used = loadable_classes_used; // 暂存列表中类的数量
-    loadable_classes = nil; // loadable_classes 指向指向 nil，与原来的列表脱离关系
+    loadable_classes = nil; // loadable_classes 指向指向 nil，与原来的列表脱离关系 --将原来的归零位置
     loadable_classes_allocated = 0; // 容量清零
     loadable_classes_used = 0; // 类的个数清零
     
@@ -227,6 +234,7 @@ static void call_class_loads(void)
             _objc_inform("LOAD: +[%s load]\n", cls->nameForLogging());
         }
         (*load_method)(cls, SEL_load); // 直接调用 +load 的 imp 函数，跳过 objc_msgSend 速度更快
+        //为啥不是(*load_method)(cls, load_method); 什么时候给这个宏 SEL_load 赋值了？
     }
     
     // Destroy the detached list.
@@ -382,10 +390,10 @@ void call_load_methods(void)
         }
 
         // 2. Call category +loads ONCE
-        more_categories = call_category_loads();
+        more_categories = call_category_loads(); //返回的是 新添加进来的分类 如果上次操作之后又有新添加进来的分类，就会循环再去执行
 
         // 3. Run more +loads if there are classes OR more untried categories
-    } while (loadable_classes_used > 0  ||  more_categories);
+    } while (loadable_classes_used > 0  ||  more_categories); //有新添加进来的分类或者 子类 需要进行load 就去执行
 
     objc_autoreleasePoolPop(pool);
 
