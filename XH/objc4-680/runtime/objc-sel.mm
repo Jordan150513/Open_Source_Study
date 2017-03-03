@@ -212,7 +212,7 @@ SEL sel_registerName(const char *name) {
     return __sel_registerName(name, 1, 1);     // YES lock, YES copy
 }
 
-// 注册 SEL 的名字，不加锁
+// 注册 SEL 的名字，不加锁  fix-up的时候需要做这个事情 对协议的每一个方法的的名字
 SEL sel_registerNameNoLock(const char *name, bool copy) {
     return __sel_registerName(name, 0, copy);  // NO lock, maybe copy
 }

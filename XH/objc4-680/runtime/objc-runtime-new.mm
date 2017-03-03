@@ -1982,6 +1982,8 @@ static Protocol *getProtocol(const char *name)
 **********************************************************************/
 // 获得重映射的协议，protocol_ref_t 是未重映射的协议类型（其实和 protocol_t * 一样）
 // 调用者：太多了，不写了
+
+//把一个没有映射的协议名称 进行映射操作 也就是重整一下名字？？
 static protocol_t *remapProtocol(protocol_ref_t proto)
 {
     runtimeLock.assertLocked();
@@ -3694,6 +3696,9 @@ void _unload_image(header_info *hi)
 * Locking: none
 **********************************************************************/
 // 返回方法的 objc_method_description
+
+//调用者 ：Protocol 中的 - (struct objc_method_description *) descriptionForInstanceMethod:(SEL)aSel 进行了调用
+
 struct objc_method_description *
 method_getDescription(Method m)
 {
@@ -4003,6 +4008,8 @@ static uint32_t getExtendedTypesIndexForMethod(protocol_t *proto, const method_t
 * Fixes up a single method list in a protocol.
 **********************************************************************/
 // fix-up 协议中的单独的一个方法列表
+// fix up 协议就是 逐一 将子协议都fix-up 将每一个协议的方法列表进行如下的fix-up操作
+ // fixup 其实就干了三件事：1.注册 sel；2.排查需要被忽略的方法；3.将列表中的方法按照 sel 字符串的地址排序；
 static void
 fixupProtocolMethodList(protocol_t *proto, method_list_t *mlist,  
                         bool required/*是否必选*/, bool instance/*是否是实例方法*/)
@@ -4068,6 +4075,10 @@ fixupProtocolMethodList(protocol_t *proto, method_list_t *mlist,
 // fixup 指定的协议，其实是 fixup 协议里的4个方法列表
 // 但是不会检查 proto 原来是否已经被 fixedup，检查的步骤会在 fixupProtocolIfNeeded() 中做
 // 调用者：fixupProtocolIfNeeded()
+// fix-up协议 ：是干啥？
+// 如果子协议没有 fix-up 也要进行fix-up
+// 然后自己 本协议做 fix-up： fix-up协议的方法，就是对协议的方法进行的操作： 什么操作呢？
+//
 static void 
 fixupProtocol(protocol_t *proto)
 {
@@ -4109,7 +4120,7 @@ fixupProtocolIfNeeded(protocol_t *proto)
                                   // 如果原来是加锁了的，后面再加锁一次，就死锁了
     assert(proto);
 
-    if (!proto->isFixedUp()) { // 如果还没有 fix-up
+    if (!proto->isFixedUp()) { // 如果还没有 fix-up 协议的fix-up 是啥？
         rwlock_writer_t lock(runtimeLock); // runtimeLock 加写锁
         fixupProtocol(proto); // 调用 fixupProtocol() 将其 fix-up 了
     }
@@ -4196,6 +4207,7 @@ protocol_getMethod_nolock(protocol_t *proto, SEL sel,
 **********************************************************************/
 // 取得 proto 协议中符合指定条件的方法，调用 protocol_getMethod_nolock() 完成查找
 // 但多了 fixup 和 加锁 两个步骤
+//调用者：
 Method 
 protocol_getMethod(protocol_t *proto, SEL sel, bool isRequiredMethod, bool isInstanceMethod, bool recursive)
 {
@@ -4372,8 +4384,10 @@ protocol_getMethodDescription(Protocol *p, SEL aSel,
 // 按下面代码的意思，就是 self 协议本身以及它的子协议中是否有一个协议与 other 协议的 mangledName 相同，
 // 即 other 协议是 self 协议的子集，
 // 这是一个递归函数，
-// 还是个无锁版本
+// 还是个无锁版本？？？？实现需要加锁啊
 // 调用者：class_conformsToProtocol() / protocol_conformsToProtocol()
+
+//  判断 一个协议是否遵守另外一个协议
 static bool 
 protocol_conformsToProtocol_nolock(protocol_t *self, protocol_t *other)
 {
@@ -4396,13 +4410,14 @@ protocol_conformsToProtocol_nolock(protocol_t *self, protocol_t *other)
         uintptr_t i;
         // 遍历子协议
         for (i = 0; i < self->protocols->count; i++) {
-            // 取得重映射后的子协议
+            // 取得重映射后的子协议 也就是去的mangledName之后的协议的mangledName
             protocol_t *proto = remapProtocol(self->protocols->list[i]);
             // 如果有子协议的 mangledName 和 other 协议的 mangledName 相同，就返回 YES，停止递归
             if (0 == strcmp(other->mangledName, proto->mangledName)) {
+                //就是比较协议的名字，如果传过来的协议，在 本协议 的self->protocols->list[]里面，那么就说明是yes 遵守该协议 中间有一个名字转换映射的过程
                 return YES;
             }
-            // 递归查找子协议的子协议中是否有符合的
+            // 递归查找子协议的子协议中是否有符合的 看传过来的这个协议的子协议是否有遵守的 这个other协议的 这是在for循环里面的
             if (protocol_conformsToProtocol_nolock(proto, other)) {
                 return YES;
             }

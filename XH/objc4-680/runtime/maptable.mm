@@ -42,7 +42,8 @@
 #else
     #define INLINE inline
 #endif
-
+// Map 暂且理解为 映射
+// Buckets 暂且理解为 槽 容器类的结构 缓存的时候 也用的这个存储结构
 typedef struct _MapPair {
     const void	*key;
     const void	*value;
@@ -77,7 +78,7 @@ static INLINE void freeBuckets(void *p) {
     free(-1+(MapPair *)p);
 }
 
-/*****		Global data and bootstrap	**********************/
+/*****		Global data and bootstrap 引导？	**********************/
 
 static int isEqualPrototype (const void *info, const void *data1, const void *data2) {
     NXHashTablePrototype        *proto1 = (NXHashTablePrototype *) data1;

@@ -88,7 +88,7 @@ typedef struct objc_object Protocol;
 /// Defines a method
 struct objc_method_description {  // 方法的描述结构体
 	SEL name;     // 方法名          /**< The name of the method */
-	char *types;  // 方法类型字符串   /**< The types of the method arguments */
+	char *types;  // 方法 参数类型字符串   /**< The types of the method arguments */
 };
 
 /// Defines a property attribute
