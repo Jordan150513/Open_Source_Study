@@ -256,6 +256,9 @@ const char *object_getClassName(id obj)
  * object_getMethodImplementation.
  **********************************************************************/
 //  取得 obj 对象中的指定 SEL 对应的方法的函数指针
+// 这个寻找IMP的是在哪里调用的？？在NSObject.mm + (IMP)methodForSelector:(SEL)sel 和 + (IMP)methodForSelector:(SEL)sel  中调用
+// objc-weak中也有调用
+
 IMP object_getMethodImplementation(id obj, SEL name)
 {
     // 先取 obj 对象的类，

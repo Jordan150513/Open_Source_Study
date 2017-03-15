@@ -5233,6 +5233,8 @@ class_copyIvarList(Class cls, unsigned int *outCount)
 // 返回 cls 类的所有属性
 // 返回值是数组，在堆中分配，里面存了所有属性的地址，因为是堆中分配的，所以调用者需要负责释放，
 // outCount 是输出参数，记录了数组中属性的数目
+// JSONModel 的实现 也主要用了这个方法 拷贝Model里面的所有属性值 然后逐一遍历 存在一个tmp的字典里 然后再赋值
+// 我现在比较关心 各个成员属性 的 weak strong assign是怎么实现的 有什么区别 在具体的源码中 而不是大家都知道的 那些文字说明
 objc_property_t *
 class_copyPropertyList(Class cls, unsigned int *outCount)
 {

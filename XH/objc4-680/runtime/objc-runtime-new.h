@@ -382,6 +382,22 @@ struct property_t {
     const char *name;  // 属性名，堆中分配
     const char *attributes; // 属性的特性字符串，标识了属性有哪些特性
                             // 该字符串是在堆中分配的
+    
+    // JSONModel 中 会获取每一个属性的 名字和 属性attributes 就是这个
+    // po property_getName(properties[0])
+    // 输出是 id 就是属性的名字 类型是NSInter
+    
+//    (lldb) po property_getAttributes(properties[0])
+//    "Tq,N,V_id"
+//    
+//    (lldb) po property_getAttributes(properties[1])
+//    "T@"NSString",&,N,V_country"   其中的 &,N 标示什么？ Strong weak assign copy 是如何反应在属性列表里面的？？？？
+//    
+//    (lldb) po property_getAttributes(properties[2])
+//    "T@"NSString",&,N,V_dialCode"
+//    
+//    (lldb) po property_getAttributes(properties[3])
+//    "TB,N,V_isInEurope"  类型是BOOL
 };
 
 #pragma mark - method_list_t
@@ -1916,6 +1932,8 @@ struct objc_class : objc_object {
         bits.setFastInstanceSize(newSize);
     }
 };
+// objc_class 定义结束
+
 
 // swift 的类，继承自 objc_class，且多了一些变量
 // 应该是为了更好地与 swift 兼容
